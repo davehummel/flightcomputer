@@ -22,6 +22,32 @@ void radioInterrupt(void) { radioTask.interruptTriggered(); }
 
 void startRadioActions();
 
+class ControlInputAction : RadioAction, RunnableTask {
+
+    public:
+    int8_t joyH,joyV;
+    uint8_t slideH,slideV;
+
+   void onReceive(uint8_t length, uint8_t *data) {
+       if (data[0] == RADIO_MSG_ID::TRANSMIT_CONTROLS){
+           joyH = data[1];
+           joyV = data[2];
+           slideH = data[3];
+           slideV = data[4];
+           FDOS_LOG.printf("JH:%i JV:%i SH:%i SV:%i\n",joyH,joyV,slideH,slideV);
+       }
+   }
+
+
+    void onStart() {
+       joyH = joyV = 0;
+       slideH = slideV = 0;
+    }
+
+    void onStop() {
+    }
+};
+
 class SustainConnectionAction : RadioAction, RunnableTask {
 
     uint8_t missedHBCount = 0;

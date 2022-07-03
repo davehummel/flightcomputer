@@ -74,14 +74,14 @@ float accData[2][3] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
 float magData[2][3] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
 float qt[2][4] = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f}; // USFSMAX quaternions
 // float QT[2][4] = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f}; // 9DOF quaternions
-float angle[2][2] = {0.0f, 0.0f, 0.0f, 0.0f};                      // USFSMAX P,R Euler angles
+float angle[2][2] = {0.0f, 0.0f, 0.0f, 0.0f}; // USFSMAX P,R Euler angles
 // float ANGLE[2][2] = {0.0f, 0.0f, 0.0f, 0.0f};                      // 9DOF P,R Euler angles
-float heading[2] = {0.0f, 0.0f};                                   // USFSMAX Heading Euler angle
+float heading[2] = {0.0f, 0.0f}; // USFSMAX Heading Euler angle
 // float HEADING[2] = {0.0f, 0.0f};                                   // 9DOF Heading Euler angle
-                                                                   // Madgewick filter (RPS/s)
-                                                                   // Madgewick fliter Compute zeta (Small or zero)
-                                                                   // Mahony filter 2X integral gain (Ki)
-float integralFBx = 0.0f;                                          // Mahony filter integral error terms
+// Madgewick filter (RPS/s)
+// Madgewick fliter Compute zeta (Small or zero)
+// Mahony filter 2X integral gain (Ki)
+float integralFBx = 0.0f; // Mahony filter integral error terms
 float integralFBy = 0.0f;
 float integralFBz = 0.0f;
 
@@ -106,8 +106,8 @@ void MotionTask::initSensors() {
 
 void MotionTask::calibrateGyro() { sensor_cal.GyroCal(); }
 
-void MotionTask::fetchOrientationData() { 
-    imu_0.computeIMU(); 
+void MotionTask::fetchOrientationData() {
+    imu_0.computeIMU();
     yaw = heading[0];
     pitch = angle[0][1];
     roll = angle[0][0];
@@ -118,30 +118,21 @@ void MotionTask::fetchBarometerData() {
     pressureHPA = ((float)baroADC[0]) / 4096.0f;
 }
 
-uint8_t x = 0;
+#ifdef USFSMAX_TRACKING
+uint8_t trace_count = 0;
+#endif
 
 void MotionTask::run(TIME_INT_t time) {
     fetchOrientationData();
     if ((barometerReady = (!barometerReady)) == true) {
         fetchBarometerData();
     }
-    x++;
-    if (x == 100) {
+#ifdef USFSMAX_TRACKING
+
+    if (trace_count % USFSMAX_TRACE_EVERY == 0) {
         // Euler angles
-        Serial.print("USFSMAX Yaw, Pitch, Roll: ");
-        Serial.print(yaw, 2);
-        Serial.print(", ");
-        Serial.print(pitch, 2);
-        Serial.print(", ");
-        Serial.println(roll, 2);
+        Serial.printf("USFSMAX Y:%.2f P:%.2f R:%.2f B:%.2f\n", yaw, pitch, roll, pressureHPA);
     }
-
-    if (x == 100) {
-        Serial.print("Baro pressure = ");
-        Serial.print(pressureHPA);
-        Serial.println(" hPa");
-    }
-
-    if (x == 100)
-        x = 0;
+    trace_count++;
+#endif
 }

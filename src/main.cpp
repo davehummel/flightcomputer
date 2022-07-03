@@ -11,7 +11,11 @@
 
 #include "FlightMessages.h"
 #include <MotionTask.h>
+#include <Navigation.h>
 #include <RadioTask.h>
+
+#include "TargetOrientationNav.h"
+// #include "TestNav.h"
 
 Logger FDOS_LOG(&Serial);
 
@@ -23,94 +27,12 @@ VMExecutor executor;
 
 MotionTask motionSensor;
 
-class ESC : RunnableTask {
-  private:
-    uint8_t initStep;
-
-    uint8_t motorPins[MOTOR_COUNT] = MOTOR_PINS;
-
-    float speeds[MOTOR_COUNT] = {0};
-
-    void setAllSpeeds(float speed) {
-        for (uint8_t i = 0; i < MOTOR_COUNT; i++) {
-            setSpeed(i, speed);
-        }
-    }
-
-    void run(TIME_INT_t time) {
-        FDOS_LOG.print('.');
-        initStep++;
-        switch (initStep) {
-        case 1:
-            setAllSpeeds(0);
-            return;
-        case 2:
-            setAllSpeeds(.5);
-            return;
-        case 3:
-            setAllSpeeds(1);
-            return;
-        case 4:
-            setAllSpeeds(.25);
-            return;
-        default:
-            setAllSpeeds(0);
-            FDOS_LOG.println(" Completed!");
-            return;
-        }
-    }
-
-    TIME_INT_t getNextInterval(TIME_INT_t lastInterval) {
-        switch (initStep) {
-        case 1:
-            return 2 * MICROS_PER_SECOND;
-        case 2:
-            return .25 * MICROS_PER_SECOND;
-        case 3:
-            return .5 * MICROS_PER_SECOND;
-        case 4:
-            return .25 * MICROS_PER_SECOND;
-        default:
-            return -1;
-        }
-    }
-
-  public:
-    void initMotors() {
-        FDOS_LOG.print("PWM ESC init Started.");
-        initStep = 0;
-        executor.schedule(this, VMExecutor::getTimingPair(0, FrequencyUnitEnum::second));
-    }
-
-    void setSpeed(uint8_t motorNum, float speed) {
-        if (motorNum >= MOTOR_COUNT)
-            return;
-        if (speed < 0)
-            speed = 0;
-        else if (speed > 1)
-            speed = 1;
-        speeds[motorNum] = speed;
-        analogWrite(motorPins[motorNum], 204 + 206 * speed);
-    }
-
-    ESC() {
-        analogWriteResolution(12);
-        for (uint8_t i = 0; i < MOTOR_COUNT; i++) {
-            pinMode(motorPins[i], OUTPUT);
-            analogWriteFrequency(motorPins[i], MOTOR_PWM_FREQ);
-            setSpeed(i, 0);
-        }
-    }
-
-    float getSpeed(uint8_t motorNum) {
-        if (motorNum >= MOTOR_COUNT)
-            return -1;
-        return speeds[motorNum];
-    }
-
-} esc;
+ESC esc(&executor);
 
 RadioTask radioTask(&radio);
+
+TargetOrientationNav nav(&esc, &motionSensor);
+// DirectInputNav nav(&esc, &motionSensor);  // Test Nav
 
 void radioInterrupt(void) { radioTask.interruptTriggered(); }
 
@@ -124,26 +46,54 @@ class ControlInputAction : RadioAction {
     uint8_t slideH = 0;
     uint8_t slideV = 0;
 
+    ct_config_t controlConfig;
+
     void onReceive(uint8_t length, uint8_t *data) {
-        if (data[0] == RADIO_MSG_ID::TRANSMIT_CONTROLS) {
+        switch (data[0]) {
+        case RADIO_MSG_ID::FLIGHT_MODE_UPDATE:
+            nav.connectESC(data[1]);
+            FDOS_LOG.print("Flight mode ");
+            FDOS_LOG.println(data[1] ? "On" : "Off");
+            return;
+
+        case RADIO_MSG_ID::TRANSMIT_CONTROLS:
             joyH = data[1];
             joyV = data[2];
             slideH = data[3];
             slideV = data[4];
 
             FDOS_LOG.printf("JH:%i JV:%i SH:%i SV:%i\n", joyH, joyV, slideH, slideV);
-            // This is a test using radio source to change motor speeds
+
+            nav.recordInput(joyH, joyV, slideH, slideV);
+            return;
+
+        case RADIO_MSG_ID::RESET_ORIENTATION:
+            FDOS_LOG.println("HOLDING new orientation");
+            joyH = 0;
+            joyV = 0;
+            slideH = 0;
+            nav.holdOrientation();
+            return;
+
+        case RADIO_MSG_ID::CHANGE_CONFIG:
+            msgFromBytes(&controlConfig, data + 1, controlConfig.size);
+            nav.setControlMode(ct_config_t::DIRECT == controlConfig.yawMode, ct_config_t::DIRECT == controlConfig.pitchMode,
+                               ct_config_t::DIRECT == controlConfig.rollMode);
+            FDOS_LOG.printf("Control changes y:%i p:%i r:%i\n", controlConfig.yawMode, controlConfig.pitchMode, controlConfig.rollMode);
+            return;
         }
     }
 
     void onStart() {
         joyH = joyV = 0;
         slideH = slideV = 0;
+        nav.recordInput(joyH, joyV, slideH, slideV);
     }
 
     void onStop() {
         joyH = joyV = 0;
         slideH = slideV = 0;
+        nav.recordInput(joyH, joyV, slideH, slideV);
     }
 } controlInputAction;
 
@@ -158,13 +108,14 @@ class SustainConnectionAction : RadioAction, RunnableTask {
     uint16_t getBatteryVoltage() { return analogRead(BATTERY_SENS_PIN); }
 
     void onReceive(uint8_t length, uint8_t *data) {
-        if (missedComCount == 1) { // If greater than one, already sent on hb
-            requestSend();
-        }
-        missedComCount = 0;
         if (data[0] == CT_HEARTBEAT) {
-            FDOS_LOG.println(F("Heartbeat received from controller"));
-            msgFromBytes(lastCTHB, data + 1);
+            FDOS_LOG.print("Heartbeat received from controller : enabled = ");
+            msgFromBytes(&lastCTHB, data + 1, ct_heartbeat_t::size);
+            FDOS_LOG.println(lastCTHB.flightModeEnabled);
+            // if (lastCTHB.flightModeEnabled!=nav.isESCConnected())
+            //     nav.connectESC(lastCTHB.flightModeEnabled);
+            requestSend();
+            missedComCount = 0;
         }
     }
 
@@ -173,8 +124,11 @@ class SustainConnectionAction : RadioAction, RunnableTask {
         float snr = radio.getSNR();
         FDOS_LOG.print(F("SNR:"));
         FDOS_LOG.println(snr);
-
+#if defined(TEENSYDUINO)
         lastFCHB.batV = (getBatteryVoltage() - 3430) / 3.2;
+#elif defined(M0_FEATHER)
+        lastFCHB.batV = ((getBatteryVoltage() * 2 * 3.3) / 4096.0 - 3.2) * 100;
+#endif
         lastFCHB.snr = snr * 10;
 
         lastFCHB.headings[0] = convertHeading(motionSensor.yaw);
@@ -182,18 +136,24 @@ class SustainConnectionAction : RadioAction, RunnableTask {
         lastFCHB.headings[2] = convertHeading(motionSensor.roll);
         lastFCHB.pressure = convertPressure(motionSensor.pressureHPA);
 
-        lastFCHB.speeds[0] = esc.getSpeed(0) * 255;
-        lastFCHB.speeds[0] = esc.getSpeed(1) * 255;
-        lastFCHB.speeds[0] = esc.getSpeed(2) * 255;
-        lastFCHB.speeds[0] = esc.getSpeed(3) * 255;
+        lastFCHB.targetHeadings[0] = nav.targetOrientation.yaw;
+        lastFCHB.targetHeadings[1] = nav.targetOrientation.pitch;
+        lastFCHB.targetHeadings[2] = nav.targetOrientation.roll;
+
+        lastFCHB.speeds[0] = esc.getSpeed(0) / 4;
+        lastFCHB.speeds[1] = esc.getSpeed(1) / 4;
+        lastFCHB.speeds[2] = esc.getSpeed(2) / 4;
+        lastFCHB.speeds[3] = esc.getSpeed(3) / 4;
 
         // lastFCHB.print((Print*)&FDOS_LOG);
 
         data[0] = FC_HEARTBEAT;
-        msgToBytes(lastFCHB, data + 1);
+        msgToBytes(&lastFCHB, data + 1, fc_heartbeat_t::size);
 
         FDOS_LOG.print(F("Batt:"));
-        FDOS_LOG.println(getBatteryVoltage());
+        FDOS_LOG.print(getBatteryVoltage());
+        FDOS_LOG.print(F(" -> "));
+        FDOS_LOG.println(lastFCHB.batV);
 
         return lastFCHB.size + 1;
     }
@@ -201,11 +161,10 @@ class SustainConnectionAction : RadioAction, RunnableTask {
     void run(TIME_INT_t time) {
         if (missedComCount > FC_DC_TIMEOUT_SECONDS) {
             FDOS_LOG.println(F("DISCONNECTING TRANSMITTER - Timeout"));
+            nav.connectESC(false);
             radioTask->removeAllActions();
             startRadioActions();
             return;
-        } else if (missedComCount %2 == 1) {
-            requestSend();
         }
         missedComCount++;
     }
@@ -214,7 +173,7 @@ class SustainConnectionAction : RadioAction, RunnableTask {
     void onStart() {
 
         missedComCount = 0;
-
+        nav.setControlMode(false, false, false);
         if (cancel != NULL)
             cancel->cancel();
         cancel = executor.schedule((RunnableTask *)this, executor.getTimingPair(1, FrequencyUnitEnum::second));
@@ -283,14 +242,18 @@ void startRadioActions() { radioTask.addAction((RadioAction *)&beaconAction); }
 void setup() {
     analogReadResolution(12);
     Serial.begin(921600);
-    pinMode(BATTERY_SENS_PIN, INPUT_PULLUP);
     pinMode(LED_PIN, OUTPUT);
-    digitalWrite(LED_PIN, false);
+    digitalWrite(LED_PIN, LOW);
+    pinMode(BATTERY_SENS_PIN, INPUT_PULLUP);
+#if defined(M0_FEATHER)
+    pinMode(5, OUTPUT);
+    pinMode(6, OUTPUT);
+    digitalWrite(5, HIGH);
+    digitalWrite(6, HIGH);
+#endif
 
-    // put your setup code here, to run once:
+    Serial.println("[SX1276] Initializing ...");
 
-    FDOS_LOG.println("[SX1276] Initializing ...");
-    // Seems to need this delay to start reliably
     int state = radio.begin(RADIO_CARRIER_FREQ, RADIO_LINK_BANDWIDTH, RADIO_SPREADING_FACTOR); //-23dBm
 
     if (state == RADIOLIB_ERR_NONE) {
@@ -319,19 +282,17 @@ void setup() {
 
     radio.setDio0Action(radioInterrupt);
 
-    FDOS_LOG.println("Initializing esc signals");
-    esc.initMotors();
-
     FDOS_LOG.println("Initializing Motion Sensor");
     motionSensor.initSensors();
     FDOS_LOG.println("Calibrating , hope you didnt move!");
     motionSensor.calibrateGyro();
-
     executor.schedule((RunnableTask *)&motionSensor, VMExecutor::getTimingPair(USFSMAX_IMU_RATE, FrequencyUnitEnum::per_second));
-
-    executor.schedule((RunnableTask *)&radioTask, executor.getTimingPair(RADIO_INTERVAL_MILLIS, FrequencyUnitEnum::milli));
-
+    executor.schedule((RunnableTask *)&radioTask, VMExecutor::getTimingPair(RADIO_INTERVAL_MILLIS, FrequencyUnitEnum::milli));
+    // This task will control its own timing after first launch.  Give 2 seconds for other systems to spin up
+    executor.schedule((RunnableTask *)&nav, VMExecutor::getTimingPair(NAV_RATE, FrequencyUnitEnum::per_second));
     startRadioActions();
+    FDOS_LOG.println("Initializing esc signals");
+    esc.initMotors();
 }
 
 void loop() {

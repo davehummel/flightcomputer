@@ -42,10 +42,7 @@ extern float                            angle[2][2];
 extern float                            accData[2][3];
 extern float                            gyroData[2][3];
 extern float                            magData[2][3];
-extern int16_t                          accLIN[2][3];
-extern float                            QT[2][4];                                                                                                        // 6DOF quaternions
-extern float                            ANGLE[2][2];                                                                                                     // 6DOF P,R Euler angles
-extern float                            HEADING[2];                                                                                                      // 6DOF Heading Euler angle
+extern int16_t                          accLIN[2][3];                                                                                           
 extern float                            acc_LIN[2][3];                                                                                                   // 6DOF linear acceleration
 extern float                            Mx[2];
 extern float                            My[2];

@@ -202,7 +202,6 @@ void USFSMAX::GoToSleep()
 
 void USFSMAX::Upload_cfg(CoProcessorConfig_t Config)
 {
-  uint8_t STAT;
   uint8_t CmdByte;
 
   CmdByte = 0x08;                                                                                                                  // Clears bit0 to stop fusion an sets bit3 to specify configuration uplaod

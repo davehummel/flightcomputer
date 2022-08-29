@@ -7,15 +7,15 @@
 #include "VMExecutor.h"
 
 #if defined(TEENSYDUINO)
-#include "PWMServo.h"
+#include "Servo.h"
 #else
 #include "Servo.h"
 #endif
 
 struct esc_objective_attr {
-    int16_t roll;  // -1000 max roll CCW, 1000 max roll CW
-    int16_t pitch; // -1000 max pitch down, 1000 max pitch up
-    int16_t yaw;   // -1000 max yaw left, 1000 max yaw right
+    int16_t roll;      // -1000 max roll CCW, 1000 max roll CW
+    int16_t pitch;     // -1000 max pitch down, 1000 max pitch up
+    int16_t yaw;       // -1000 max yaw left, 1000 max yaw right
     uint16_t throttle; // 0 no throttle, 1000 max throttle
 };
 
@@ -28,7 +28,7 @@ class ESC {
      *
      */
   private:
-    PWMServo  servos[MOTOR_COUNT];
+    Servo servos[MOTOR_COUNT];
     class InitMotorTask : public RunnableTask {
 
         uint8_t initStep = 0;

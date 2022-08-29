@@ -54,7 +54,8 @@ void ESC::initMotors() {
 void ESC::setMotorDirect(uint8_t motorNum, uint16_t speed) {
     if (motorNum >= MOTOR_COUNT)
         return;
-    if (speed > 1000) speed = 1000;
+    if (speed > 1000)
+        speed = 1000;
 
     speeds[motorNum] = speed;
 
@@ -120,7 +121,7 @@ void ESC::setMotorObjective(esc_objective_attr force) {
             roll  offset [-.5, .5]
                          [.5, -.5]
         */
-        if (TL_CLOCKWISE  == 1)
+        if (TL_CLOCKWISE == 1)
             rollOffset = -rollOffset;
 
         rawThrottles[0] += rollOffset;
@@ -164,9 +165,9 @@ void ESC::setMotorObjective(esc_objective_attr force) {
     }
 
 #ifdef ESC_TRACE
-    if (esc_trace_count % ESC_TRACE_EVERY == 0){
-    FDOS_LOG.printf("ESC T:%i Y:%i P:%i R:%i -> \n [%4i,%4i]\n[%4i,%4i]\n", force.throttle, force.yaw, force.pitch, force.roll, getSpeed(0), getSpeed(1),
-                    getSpeed(2), getSpeed(3));
+    if (esc_trace_count % ESC_TRACE_EVERY == 0) {
+        FDOS_LOG.printf("ESC T:%i Y:%i P:%i R:%i -> \n [%4i,%4i]\n[%4i,%4i]\n", force.throttle, force.yaw, force.pitch, force.roll, getSpeed(0), getSpeed(1),
+                        getSpeed(2), getSpeed(3));
     }
     esc_trace_count++;
 #endif

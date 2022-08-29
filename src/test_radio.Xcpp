@@ -1,0 +1,124 @@
+#include <Arduino.h>
+#include <RadioLib.h>
+
+#include "FDOS_LOG.h"
+
+#include "VMExecutor.h"
+#include "VMTime.h"
+
+#include <RadioTask.h>
+
+#if defined(__IMXRT1062__)
+extern "C" uint32_t set_arm_clock(uint32_t frequency);
+#endif
+
+Logger FDOS_LOG(&Serial);
+
+SX1276 radio(new Module(RADIO_CS_PIN, RADIO_DIO0_PIN, RADIO_RST_PIN, RADIO_DIO1_PIN, SPI, SPISettings(SPI_RADIO_FREQ, MSBFIRST, SPI_MODE0)));
+void beginReceive(void) { radio.startReceive(); }
+
+VMExecutor executor;
+
+RadioTask radioTask(&radio);
+
+void radioInterrupt(void) { radioTask.interruptTriggered(); }
+
+class TestRadioAction : RadioAction, RunnableTask {
+
+  public:
+    uint16_t boxX = 1, boxY = 1;
+    void onReceive(uint8_t length, uint8_t *data) {
+        boxX = (data[1] << 8) + data[0];
+        boxY++;
+        if (boxX % 100 == 99) {
+            requestSend();
+        }
+    }
+
+    // returns length of data to send
+    uint8_t onSendReady(uint8_t *data) {
+        data[0] = boxX & 0xFF;
+        data[1] = (boxX & 0xFF00) >> 8;
+        data[2] = boxY & 0xFF;
+        data[3] = (boxY & 0xFF00) >> 8;
+        FDOS_LOG.print("Sending ");
+        FDOS_LOG.println(boxY);
+        boxY = 0;
+        digitalWrite(LED_PIN, LOW);
+        return 4;
+    }
+
+    void onStart() { executor.schedule((RunnableTask *)this, executor.getTimingPair(10000, FrequencyUnitEnum::milli)); }
+
+    void onStop() {}
+
+    void run(TIME_INT_t time) { FDOS_LOG.print("."); }
+
+} radioAction;
+
+void setup() {
+    analogReadResolution(12);
+    Serial.begin(921600);
+    SPI.begin();
+    pinMode(LED_PIN, OUTPUT);
+    digitalWrite(LED_PIN, LOW);
+
+#if defined(M0_FEATHER)
+    pinMode(5, OUTPUT);
+    pinMode(6, OUTPUT);
+    digitalWrite(5, HIGH);
+    digitalWrite(6, HIGH);
+#endif
+
+    Serial.println("[SX1276] Initializing ...");
+    delay(1000);
+
+    int state = radio.begin(RADIO_CARRIER_FREQ, RADIO_LINK_BANDWIDTH, RADIO_SPREADING_FACTOR); //-23dBm
+
+    if (state == RADIOLIB_ERR_NONE) {
+        FDOS_LOG.print(" started, configuring ...");
+    } else {
+        FDOS_LOG.print("SX1276 failed. Code:");
+        FDOS_LOG.println(state);
+        while (true) {
+            digitalWrite(LED_PIN, true);
+            delay(200);
+            digitalWrite(LED_PIN, false);
+            delay(100);
+        }
+    }
+
+    if (radio.setOutputPower(RADIO_POWER) == RADIOLIB_ERR_INVALID_OUTPUT_POWER) {
+        FDOS_LOG.println(F("Invalid Power!"));
+        while (true) {
+            digitalWrite(LED_PIN, true);
+            delay(100);
+            digitalWrite(LED_PIN, false);
+            delay(200);
+        }
+    }
+    FDOS_LOG.println("success!");
+
+    radio.setDio0Action(radioInterrupt);
+    radio.setDio1Action(radioInterrupt);
+
+    executor.schedule((RunnableTask *)&radioTask, executor.getTimingPair(RADIO_INTERVAL_MILLIS, FrequencyUnitEnum::milli));
+    radioTask.addAction((RadioAction *)&radioAction);
+}
+
+void loop() {
+    uint32_t delayTime = executor.runSchedule();
+    // You may want to allow the loop to finish and avoid long delays
+    //    if you are using background arduino features
+    if (delayTime > 500000)
+        delayTime = 500000;
+    if (delayTime > MIN_MICRO_REST) {
+// #if defined(__IMXRT1062__)
+//         set_arm_clock(1000000);
+// #endif
+        delayMicroseconds(delayTime - MIN_MICRO_REST);
+// #if defined(__IMXRT1062__)
+//         set_arm_clock(120000000);
+// #endif
+    }
+}

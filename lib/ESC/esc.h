@@ -7,6 +7,7 @@
 #include "VMExecutor.h"
 
 #if defined(TEENSYDUINO)
+#include "PWMServo.h"
 #else
 #include "Servo.h"
 #endif
@@ -27,7 +28,7 @@ class ESC {
      *
      */
   private:
-    Servo servos[MOTOR_COUNT];
+    PWMServo  servos[MOTOR_COUNT];
     class InitMotorTask : public RunnableTask {
 
         uint8_t initStep = 0;

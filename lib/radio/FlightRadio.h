@@ -8,7 +8,9 @@
 class ListenTransmitterAction : RadioAction, RunnableTask {
   private:
     ScheduledLink *cancel = NULL;
-    uint8_t receiverId = 0;
+    uint8_t transmitterId = 0;
+
+    uint8_t respondAttempt = 0;
 
   public:
 

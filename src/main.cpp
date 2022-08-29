@@ -13,6 +13,7 @@
 #include <MotionTask.h>
 #include <Navigation.h>
 #include <RadioTask.h>
+#include <FlightRadio.h>
 
 #include "TargetOrientationNav.h"
 // #include "TestNav.h"
@@ -237,7 +238,7 @@ void startRadioActions();
 
 // } beaconAction;
 
-// void startRadioActions() { radioTask.addAction((RadioAction *)&beaconAction); }
+ void startRadioActions() { radioTask.addAction((RadioAction *)&listenTransmitterAction); }
 
 void setup() {
     analogReadResolution(12);

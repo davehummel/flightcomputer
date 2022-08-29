@@ -24,6 +24,7 @@
 			"string_view": "cpp",
 			"random": "cpp",
 			"initializer_list": "cpp"
-		}
+		},
+		"platformio-ide.reopenSerialMonitorDelay": 1000
 	}
 }

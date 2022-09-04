@@ -7,7 +7,6 @@
 #include "VMExecutor.h"
 
 #if defined(TEENSYDUINO)
-#include "Servo.h"
 #else
 #include "Servo.h"
 #endif
@@ -28,7 +27,9 @@ class ESC {
      *
      */
   private:
+#ifndef TEENSYDUINO
     Servo servos[MOTOR_COUNT];
+#endif
     class InitMotorTask : public RunnableTask {
 
         uint8_t initStep = 0;

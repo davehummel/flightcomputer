@@ -20,7 +20,7 @@ class ListenTransmitterAction : RadioAction, RunnableTask {
 
     void onStop();
 
-    void onReceive(uint8_t length, uint8_t *data);
+    void onReceive(uint8_t length, uint8_t *data,bool responseExpected);
 
     uint8_t onSendReady(uint8_t *data, bool &responseExpected);
 

@@ -10,32 +10,30 @@
 #include "VMTime.h"
 
 #include "FlightMessages.h"
+#include <FlightRadio.h>
 #include <MotionTask.h>
 #include <Navigation.h>
 #include <RadioTask.h>
-#include <FlightRadio.h>
 
 #include "TargetOrientationNav.h"
 // #include "TestNav.h"
 
 Logger FDOS_LOG(&Serial);
 
-SX1276 radio(new Module(RADIO_CS_PIN, RADIO_DIO0_PIN, RADIO_RST_PIN, RADIO_DIO1_PIN));
+SX1276 RADIO = new Module(RADIO_CS_PIN, RADIO_DIO0_PIN, RADIO_RST_PIN, RADIO_DIO1_PIN);//, SPI, SPISettings(SPI_RADIO_FREQ, MSBFIRST, SPI_MODE0));
 
-void beginReceive(void) { radio.startReceive(); }
-
-VMExecutor executor;
+void beginReceive(void) { RADIO.startReceive(); }
 
 MotionTask motionSensor;
 
-ESC esc(&executor);
+ESC esc(&EXECUTOR);
 
-RadioTask radioTask(&radio);
+RadioTask RADIOTASK(&RADIO);
 
 TargetOrientationNav nav(&esc, &motionSensor);
 // DirectInputNav nav(&esc, &motionSensor);  // Test Nav
 
-void radioInterrupt(void) { radioTask.interruptTriggered(); }
+void radioInterrupt(void) { RADIOTASK.interruptTriggered(); }
 
 void startRadioActions();
 
@@ -238,7 +236,7 @@ void startRadioActions();
 
 // } beaconAction;
 
- void startRadioActions() { radioTask.addAction((RadioAction *)&listenTransmitterAction); }
+void startRadioActions() { RADIOTASK.addAction((RadioAction *)&listenTransmitterAction); }
 
 void setup() {
     analogReadResolution(12);
@@ -253,9 +251,11 @@ void setup() {
     digitalWrite(6, HIGH);
 #endif
 
+    delay(2000);
+
     Serial.println("[SX1276] Initializing ...");
 
-    int state = radio.begin(RADIO_CARRIER_FREQ, RADIO_LINK_BANDWIDTH, RADIO_SPREADING_FACTOR); //-23dBm
+    int state = RADIO.begin(RADIO_CARRIER_FREQ, RADIO_LINK_BANDWIDTH, RADIO_SPREADING_FACTOR);
 
     if (state == RADIOLIB_ERR_NONE) {
         FDOS_LOG.print(" started, configuring ...");
@@ -270,7 +270,7 @@ void setup() {
         }
     }
 
-    if (radio.setOutputPower(RADIO_POWER) == RADIOLIB_ERR_INVALID_OUTPUT_POWER) {
+    if (RADIO.setOutputPower(RADIO_POWER) == RADIOLIB_ERR_INVALID_OUTPUT_POWER) {
         FDOS_LOG.println(F("Invalid Power!"));
         while (true) {
             digitalWrite(LED_PIN, true);
@@ -281,23 +281,30 @@ void setup() {
     }
     FDOS_LOG.println(F("success!"));
 
-    radio.setDio0Action(radioInterrupt);
+    RADIO.setDio0Action(radioInterrupt);
 
     // FDOS_LOG.println("Initializing Motion Sensor");
     // motionSensor.initSensors();
     // FDOS_LOG.println("Calibrating , hope you didnt move!");
     // motionSensor.calibrateGyro();
     // executor.schedule((RunnableTask *)&motionSensor, VMExecutor::getTimingPair(USFSMAX_IMU_RATE, FrequencyUnitEnum::per_second));
-    executor.schedule((RunnableTask *)&radioTask, VMExecutor::getTimingPair(RADIO_INTERVAL_MILLIS, FrequencyUnitEnum::milli));
+    EXECUTOR.schedule((RunnableTask *)&RADIOTASK, VMExecutor::getTimingPair(RADIO_INTERVAL_MILLIS, FrequencyUnitEnum::milli));
     // This task will control its own timing after first launch.  Give 2 seconds for other systems to spin up
     // executor.schedule((RunnableTask *)&nav, VMExecutor::getTimingPair(NAV_RATE, FrequencyUnitEnum::per_second));
     startRadioActions();
     FDOS_LOG.println("Initializing esc signals");
     esc.initMotors();
+    for (uint8_t i = 0; i < 10; i++) {
+        digitalWrite(LED_PIN, true);
+        delay(50);
+        digitalWrite(LED_PIN, false);
+        delay(20);
+    }
+    
 }
 
 void loop() {
-    uint32_t delayTime = executor.runSchedule();
+    uint32_t delayTime = EXECUTOR.runSchedule();
     if (delayTime > 1000000)
         delayTime = 1000000;
     if (delayTime > MIN_MICRO_REST)

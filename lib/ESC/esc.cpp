@@ -51,6 +51,7 @@ void ESC::initMotors() {
     executor->schedule(&initTask, 1, 1);
 }
 
+uint32_t FULL_PWM = 32757 / (1000 / MOTOR_PWM_FREQ);
 void ESC::setMotorDirect(uint8_t motorNum, uint16_t speed) {
     if (motorNum >= MOTOR_COUNT)
         return;
@@ -58,13 +59,16 @@ void ESC::setMotorDirect(uint8_t motorNum, uint16_t speed) {
         speed = 1000;
 
     speeds[motorNum] = speed;
-
+#if defined(TEENSYDUINO)
+    analogWrite(motorPins[motorNum], speed * 32757 / (1000 * 20));
+#else
     servos[motorNum].writeMicroseconds(1000 + speed);
+#endif
 }
 
 ESC::ESC(VMExecutor *_executor) : executor(_executor), initTask(this) {
 #if defined(TEENSYDUINO)
-    analogWriteResolution(12);
+    analogWriteResolution(15);
     for (uint8_t i = 0; i < MOTOR_COUNT; i++) {
         pinMode(motorPins[i], OUTPUT);
         analogWriteFrequency(motorPins[i], MOTOR_PWM_FREQ);

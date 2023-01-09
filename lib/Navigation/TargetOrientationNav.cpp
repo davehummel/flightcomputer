@@ -53,23 +53,23 @@ esc_objective_attr TargetOrientationNav::nextFrame(TIME_INT_t intervalMicros) {
         targetOrientation.pitch = (hardPitchInput ? targetOrientation.pitch : currentOrientation.pitch) + pitchInput;
         esc.pitch = pitchPID.apply(currentOrientation.pitch, targetOrientation.pitch, intervalMicros / MICROS_PER_MILLI, pitchState);
     }
-
+    
     esc.throttle = (slideV * NAV_INPUT_THROTTLE_SCALE) / 255;
 
 #ifdef NAV_TRACE
     if (nav_trace_counter % NAV_TRACE_EVERY == 0) {
 // FDOS_LOG.printf("E P:%i Y:%i R:%i T:%i\n", esc.pitch, esc.yaw, esc.roll, esc.throttle);
 #ifdef NAV_TRACE_YAW_PID
-        FDOS_LOG.printf("YAW_PID I:%i D:%i pC:%i iC:%i dC:%i O:%i S:%i T:%i\n", yawState->integral, yawState->derivative, yawState->pContribution,
-                        yawState->iContribution, yawState->dContribution, yawState->output, yawState->state, yawState->target);
+        FDOS_LOG.printf("YAW_PID S:%i T:%i O:%i I:%i D:%i pC:%i iC:%i dC:%i \n", yawState->state, yawState->target, yawState->output, yawState->integral,
+                        yawState->derivative, yawState->pContribution, yawState->iContribution, yawState->dContribution);
 #endif
 #ifdef NAV_TRACE_ROLL_PID
-        FDOS_LOG.printf("RLL_PID I:%i D:%i pC:%i iC:%i dC:%i O:%i S:%i T:%i\n", rollState->integral, rollState->derivative, rollState->pContribution,
-                        rollState->iContribution, rollState->dContribution, rollState->output, rollState->state, rollState->target);
+        FDOS_LOG.printf("RLL_PID S:%i T:%i O:%i I:%i D:%i pC:%i iC:%i dC:%i \n", rollState->state, rollState->target, rollState->output, rollState->integral,
+                        rollState->derivative, rollState->pContribution, rollState->iContribution, rollState->dContribution);
 #endif
 #ifdef NAV_TRACE_PITCH_PID
-        FDOS_LOG.printf("PCH_PID I:%i D:%i pC:%i iC:%i dC:%i O:%i S:%i T:%i\n", pitchState->integral, pitchState->derivative, pitchState->pContribution,
-                        pitchState->iContribution, pitchState->dContribution, pitchState->output, pitchState->state, pitchState->target);
+        FDOS_LOG.printf("RLL_PID S:%i T:%i O:%i I:%i D:%i pC:%i iC:%i dC:%i \n", pitchState->state, pitchState->target, pitchState->output,
+                        pitchState->integral, pitchState->derivative, pitchState->pContribution, pitchState->iContribution, pitchState->dContribution);
 #endif
     }
     nav_trace_counter++;

@@ -20,7 +20,7 @@
 
 Logger FDOS_LOG(&Serial);
 
-SX1276 RADIO = new Module(RADIO_CS_PIN, RADIO_DIO0_PIN, RADIO_RST_PIN, RADIO_DIO1_PIN);//, SPI, SPISettings(SPI_RADIO_FREQ, MSBFIRST, SPI_MODE0));
+SX1276 RADIO = new Module(RADIO_CS_PIN, RADIO_DIO0_PIN, RADIO_RST_PIN, RADIO_DIO1_PIN, SPI, SPISettings(SPI_RADIO_FREQ, MSBFIRST, SPI_MODE0));
 
 void beginReceive(void) { RADIO.startReceive(); }
 
@@ -244,6 +244,10 @@ void setup() {
     pinMode(LED_PIN, OUTPUT);
     digitalWrite(LED_PIN, LOW);
     pinMode(BATTERY_SENS_PIN, INPUT_PULLUP);
+#ifdef USB_SERIAL_HID
+    Joystick.begin();
+    Joystick.useManualSend(true);
+#endif
 #if defined(M0_FEATHER)
     pinMode(5, OUTPUT);
     pinMode(6, OUTPUT);
@@ -254,8 +258,8 @@ void setup() {
     delay(2000);
 
     Serial.println("[SX1276] Initializing ...");
-
-    int state = RADIO.begin(RADIO_CARRIER_FREQ, RADIO_LINK_BANDWIDTH, RADIO_SPREADING_FACTOR);
+    SPI.begin();
+    int state = RADIO.begin(RADIO_CARRIER_FREQ, RADIO_LINK_BANDWIDTH, RADIO_SPREADING_FACTOR,RADIO_CODING_RATE);
 
     if (state == RADIOLIB_ERR_NONE) {
         FDOS_LOG.print(" started, configuring ...");
@@ -287,10 +291,13 @@ void setup() {
     // motionSensor.initSensors();
     // FDOS_LOG.println("Calibrating , hope you didnt move!");
     // motionSensor.calibrateGyro();
-    // executor.schedule((RunnableTask *)&motionSensor, VMExecutor::getTimingPair(USFSMAX_IMU_RATE, FrequencyUnitEnum::per_second));
+    // EXECUTOR.schedule((RunnableTask *)&motionSensor, VMExecutor::getTimingPair(USFSMAX_IMU_RATE, FrequencyUnitEnum::per_second));
+    // EXECUTOR.schedule((RunnableTask *)&nav, VMExecutor::getTimingPair(NAV_RATE, FrequencyUnitEnum::per_second));
+
+
     EXECUTOR.schedule((RunnableTask *)&RADIOTASK, VMExecutor::getTimingPair(RADIO_INTERVAL_MILLIS, FrequencyUnitEnum::milli));
-    // This task will control its own timing after first launch.  Give 2 seconds for other systems to spin up
-    // executor.schedule((RunnableTask *)&nav, VMExecutor::getTimingPair(NAV_RATE, FrequencyUnitEnum::per_second));
+
+ 
     startRadioActions();
     FDOS_LOG.println("Initializing esc signals");
     esc.initMotors();
@@ -300,7 +307,6 @@ void setup() {
         digitalWrite(LED_PIN, false);
         delay(20);
     }
-    
 }
 
 void loop() {

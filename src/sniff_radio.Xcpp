@@ -25,34 +25,32 @@ void radioInterrupt(void) { radioTask.interruptTriggered(); }
 
 class TestRadioAction : RadioAction, RunnableTask {
 
+    bool ledState = false;
+
   public:
-    uint16_t boxX = 1, boxY = 1;
-    void onReceive(uint8_t length, uint8_t *data) {
-        boxX = (data[1] << 8) + data[0];
-        boxY++;
-        if (boxX % 100 == 99) {
-            requestSend();
-        }
-    }
+    void onReceive(uint8_t length, uint8_t *data) { digitalWrite(LED_PIN, ledState = !ledState); }
 
     // returns length of data to send
-    uint8_t onSendReady(uint8_t *data) {
-        data[0] = boxX & 0xFF;
-        data[1] = (boxX & 0xFF00) >> 8;
-        data[2] = boxY & 0xFF;
-        data[3] = (boxY & 0xFF00) >> 8;
-        FDOS_LOG.print("Sending ");
-        FDOS_LOG.println(boxY);
-        boxY = 0;
-        digitalWrite(LED_PIN, LOW);
+    uint8_t onSendReady(uint8_t *data, bool &responseExpected) {
+        data[0] = 0;
+        data[1] = 1;
+        data[2] = 2;
+        data[3] = 3;
+        FDOS_LOG.println("  Sending [0,1,2,3]");
+        responseExpected = true;
         return 4;
     }
 
-    void onStart() { executor.schedule((RunnableTask *)this, executor.getTimingPair(10000, FrequencyUnitEnum::milli)); }
+    void onStart() {
+        // executor.schedule((RunnableTask *)this, executor.getTimingPair(10000, FrequencyUnitEnum::milli));
+    }
 
     void onStop() {}
 
-    void run(TIME_INT_t time) { FDOS_LOG.print("."); }
+    void run(TIME_INT_t time) {
+        FDOS_LOG.println("Requesting send...");
+        requestSend();
+    }
 
 } radioAction;
 
@@ -113,12 +111,12 @@ void loop() {
     if (delayTime > 500000)
         delayTime = 500000;
     if (delayTime > MIN_MICRO_REST) {
-// #if defined(__IMXRT1062__)
-//         set_arm_clock(1000000);
-// #endif
+        // #if defined(__IMXRT1062__)
+        //         set_arm_clock(1000000);
+        // #endif
         delayMicroseconds(delayTime - MIN_MICRO_REST);
-// #if defined(__IMXRT1062__)
-//         set_arm_clock(120000000);
-// #endif
+        // #if defined(__IMXRT1062__)
+        //         set_arm_clock(120000000);
+        // #endif
     }
 }

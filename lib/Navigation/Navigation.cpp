@@ -2,11 +2,11 @@
 #include <FDOS_LOG.h>
 #include <Navigation.h>
 
-void GenericNavTask::recordInput(int8_t _joyH, int8_t _joyV, uint8_t _slideH, uint8_t _slideV) {
-    joyH = _joyH;
-    joyV = _joyV;
-    slideH = _slideH;
-    slideV = _slideV;
+void GenericNavTask::recordInput(int8_t _joy1H, int8_t _joy1V, uint8_t _joy2H, uint8_t _joy2V) {
+    joy1H = _joy1H;
+    joy1V = _joy1V;
+    joy2H = _joy2H;
+    joy2V = _joy2V;
 }
 
 void GenericNavTask::run(TIME_INT_t time) {
@@ -29,6 +29,8 @@ void GenericNavTask::run(TIME_INT_t time) {
 }
 
 void GenericNavTask::connectESC(bool connected) {
+    if (connected == escConnected) return;
     escConnected = connected;
-    activateESCEvent();
+    FDOS_LOG.println("Calling activateESCEvent");
+    activateESCEvent(connected);
 }

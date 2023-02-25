@@ -47,9 +47,15 @@ void ESC::setAllSpeeds(uint16_t speed) {
 }
 
 void ESC::initMotors() {
+    setAllSpeeds(0);
+     // This will only be needed for ESC that have initialize throttle process 
     FDOS_LOG.print("PWM ESC init Started.");
     executor->schedule(&initTask, 1, 1);
+    
 }
+
+uint16_t MIN_PMW = 16383/20-2;
+uint16_t MAX_PMW = 16383/10+2;
 
 void ESC::setMotorDirect(uint8_t motorNum, uint16_t speed) {
     if (motorNum >= MOTOR_COUNT)
@@ -59,7 +65,7 @@ void ESC::setMotorDirect(uint8_t motorNum, uint16_t speed) {
 
     speeds[motorNum] = speed;
 #if defined(TEENSYDUINO)
-    // TODO convert to 1 to 2 ms range with 16383  or (32757 15 bit) or  input values
+    analogWrite(motorPins[motorNum],map(speed,0,1000,MIN_PMW,MAX_PMW));
 #else
     servos[motorNum].writeMicroseconds(1000 + speed);
 #endif

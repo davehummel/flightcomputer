@@ -15,16 +15,19 @@ class TargetOrientationNav : public GenericNavTask {
     void setControlMode(bool yawDirect, bool pitchDirect, bool rollDirect) {
         yawDirectMode = yawDirect;
         pitchDirectMode = pitchDirect;
-        rollDirectMode = rollDirect;;
+        rollDirectMode = rollDirect;
+        FDOS_LOG.printf("Setting direct control on Y:%i,P:%i,R:%i\n",yawDirect,pitchDirect,rollDirect);
     }
 
+  protected:
+     void activateESCEvent(bool activated);
   private:
     esc_objective_attr esc;
 
     bool yawDirectMode = false, pitchDirectMode = false, rollDirectMode = false;
     bool yawAssistRollMode = false;
 
-    void activateESCEvent();
+ 
 
     PID yawPID = PID(PID_YAW_KP,PID_YAW_KI, PID_YAW_KD, PID_YAW_MAXOUT, PID_YAW_INPERIOD, PID_YAW_MAXINTEGRAL);
     // PID yawPID = PID(0.0,0.0,0.0,1000,__UINT16_MAX__,400);

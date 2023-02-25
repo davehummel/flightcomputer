@@ -108,7 +108,7 @@ void SustainConnectionAction::onStop() {
     if (cancel != NULL)
         cancel->cancel();
     cancel = NULL;
-    motorEngaged = false;
+    nav->connectESC(false);
     FDOS_LOG.println("Sustain Connection stopped.");
 }
 
@@ -125,22 +125,24 @@ void SustainConnectionAction::onReceive(uint8_t length, uint8_t *data, bool resp
 
     if (data[0] == RADIO_MSG_ID::TRANSMITTER_HEARTBEAT) {
         lastReceivedTime = microsSinceEpoch();
-
         msgFromBytes(&transmitterState, data, transmitter_heartbeat_t::size);
-        motorEngaged = transmitterState.flightModeEnabled;
-        FDOS_LOG.println("HB heard!");
+        FDOS_LOG.printf("HB heard! size = %i.  enabled = %i\n",length,transmitterState.flightModeEnabled);
+        nav->connectESC(transmitterState.flightModeEnabled);
+        nav->setControlMode(transmitterState.isDirectYaw(), transmitterState.isDirectPitch(), transmitterState.isDirectRoll());
+  
         return;
     }
 
     if (data[0] == RADIO_MSG_ID::FLIGHT_INPUT) {
         lastReceivedTime = microsSinceEpoch();
         msgFromBytes(&inputState, data, flight_input_t::size);
+        nav->recordInput(inputState.joyH, inputState.joyV, inputState.slideH, inputState.throttleInput);
 #ifdef USB_SERIAL_HID
         inputState.print(&FDOS_LOG);
         Joystick.slider((inputState.throttleInput * 1023) / 254);
-        Joystick.Zrotate(((inputState.yawInput + 127) * 1023) / 254);
-        Joystick.X(((inputState.rollInput + 127) * 1023) / 254);
-        Joystick.Y(((inputState.pitchInput + 127) * 1023) / 254);
+        Joystick.Zrotate(((inputState.slideH + 127) * 1023) / 254);
+        Joystick.X(((inputState.joyH + 127) * 1023) / 254);
+        Joystick.Y(((inputState.joyV + 127) * 1023) / 254);
         Joystick.send_now();
 #endif
     }
@@ -149,28 +151,29 @@ void SustainConnectionAction::onReceive(uint8_t length, uint8_t *data, bool resp
 uint8_t SustainConnectionAction::onSendReady(uint8_t *data, bool &responseExpected) {
     digitalWrite(LED_PIN, hbLedFlip = !hbLedFlip);
 
-    uint16_t rawVlt = analogRead(BATTERY_SENS_PIN);
+    uint16_t raw = analogRead(BATTERY_SENSE_PIN);
+    receiverState.batV = raw;
+    raw = analogRead(CURRENT_SENSE_PIN);
+    receiverState.cur = raw;
 
-    receiverState.batV = ((rawVlt - 2766) * 100) / 923;
-
-    FDOS_LOG.printf("Raw vlt:%i converted:%i\n", rawVlt, receiverState.batV);
+    FDOS_LOG.printf("Voltage:%i current:%i\n", receiverState.batV , receiverState.cur );
 
     float snr = RADIO.getSNR();
     receiverState.snr = snr * 10;
 
-    receiverState.headings[0] = 1; // convertHeading(motionSensor.yaw);
-    receiverState.headings[1] = 2; // convertHeading(motionSensor.pitch);
-    receiverState.headings[2] = 3; // convertHeading(motionSensor.roll);
-    receiverState.pressure = 4;    // convertPressure(motionSensor.pressureHPA);
+    receiverState.headings[0] = convertHeading(nav->currentOrientation.yaw);
+    receiverState.headings[1] = convertHeading(nav->currentOrientation.pitch);
+    receiverState.headings[2] = convertHeading(nav->currentOrientation.roll);
+    receiverState.pressure = convertPressure(nav->currentPressure);
 
-    receiverState.targetHeadings[0] = 5; // nav.targetOrientation.yaw;
-    receiverState.targetHeadings[1] = 6; // nav.targetOrientation.pitch;
-    receiverState.targetHeadings[2] = 7; // nav.targetOrientation.roll;
+    receiverState.targetHeadings[0] = nav->targetOrientation.yaw;
+    receiverState.targetHeadings[1] = nav->targetOrientation.pitch;
+    receiverState.targetHeadings[2] = nav->targetOrientation.roll;
 
-    receiverState.speeds[0] = 8;  // esc.getSpeed(0) / 4;
-    receiverState.speeds[1] = 9;  // esc.getSpeed(1) / 4;
-    receiverState.speeds[2] = 10; // esc.getSpeed(2) / 4;
-    receiverState.speeds[3] = 11; // esc.getSpeed(3) / 4;
+    receiverState.speeds[0] = nav->getESC()->getSpeed(0) / 4;
+    receiverState.speeds[1] = nav->getESC()->getSpeed(1) / 4;
+    receiverState.speeds[2] = nav->getESC()->getSpeed(2) / 4;
+    receiverState.speeds[3] = nav->getESC()->getSpeed(3) / 4;
 
     FDOS_LOG.println("HB response:");
     receiverState.print((Print *)&FDOS_LOG);
@@ -194,4 +197,5 @@ void SustainConnectionAction::disconnect() {
     FDOS_LOG.println("SustainConnectionAction disconnect called.");
     RADIOTASK.removeAction(this);
     RADIOTASK.addAction((RadioAction *)&listenTransmitterAction);
+    nav->connectESC(false);
 }

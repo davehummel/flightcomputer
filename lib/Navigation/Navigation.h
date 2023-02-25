@@ -33,12 +33,12 @@ class GenericNavTask : public RunnableTask {
 
   protected:
     virtual esc_objective_attr nextFrame(TIME_INT_t intervalMicros) = 0;
-    virtual void activateESCEvent() {}
+    virtual void activateESCEvent(bool activated) = 0;
 
-    int8_t joyH;
-    int8_t joyV;
-    uint8_t slideH;
-    uint8_t slideV;
+    int8_t joy1H;
+    int8_t joy1V;
+    int8_t joy2H;
+    uint8_t joy2V;
 
   public:
     orient_attr currentOrientation;
@@ -55,6 +55,8 @@ class GenericNavTask : public RunnableTask {
     void connectESC(bool connected);
 
     bool isESCConnected() { return escConnected; }
+
+    ESC *getESC() { return esc; }
 
     virtual void holdOrientation() {}
 };

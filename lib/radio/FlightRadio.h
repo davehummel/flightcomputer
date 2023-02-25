@@ -4,6 +4,8 @@
 #include "RadioTask.h"
 #include "VMExecutor.h"
 
+#include "TargetOrientationNav.h"
+
 class ListenTransmitterAction : RadioAction, RunnableTask {
   private:
     ScheduledLink *cancel = NULL;
@@ -29,8 +31,6 @@ class SustainConnectionAction : RadioAction, RunnableTask {
   private:
     ScheduledLink *cancel = NULL;
 
-    bool motorEngaged = false;
-
     receiver_heartbeat_t receiverState;
 
     transmitter_heartbeat_t transmitterState;
@@ -38,8 +38,14 @@ class SustainConnectionAction : RadioAction, RunnableTask {
     flight_input_t inputState;
 
     TIME_INT_t lastReceivedTime = 0;
+ 
+    TargetOrientationNav *nav; 
+
 
   public:
+
+    void setNavSource(TargetOrientationNav *navSource){ nav = navSource; }
+
     void onStart();
 
     void onStop();
@@ -50,8 +56,6 @@ class SustainConnectionAction : RadioAction, RunnableTask {
 
     void run(TIME_INT_t time);
 
-    bool motorIsEngaged() { return motorEngaged; }
-
     bool navIsYawDirect() { return transmitterState.isDirectYaw(); }
 
     bool navIsRollDirect() { return transmitterState.isDirectRoll(); }
@@ -59,10 +63,12 @@ class SustainConnectionAction : RadioAction, RunnableTask {
     bool navIsPitchDirect() { return transmitterState.isDirectPitch(); }
 
     void disconnect();
+
 };
 
 extern ListenTransmitterAction listenTransmitterAction;
 
 extern SustainConnectionAction sustainConnectionAction;
+
 
 #endif

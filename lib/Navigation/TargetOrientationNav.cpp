@@ -21,7 +21,7 @@ pid_state_t *pitchState = 0;
 
 esc_objective_attr TargetOrientationNav::nextFrame(TIME_INT_t intervalMicros) {
 
-    int16_t rollInput = slideH == 0 ? 0 : slideH - 127;
+    int16_t rollInput =  joy2H;
 
     if (rollDirectMode) {
         esc.roll = (rollInput * 1000) / 127;
@@ -32,7 +32,7 @@ esc_objective_attr TargetOrientationNav::nextFrame(TIME_INT_t intervalMicros) {
         esc.roll = (2 * esc.roll + rollPID.apply(currentOrientation.roll, targetOrientation.roll, intervalMicros / MICROS_PER_MILLI, rollState)) / 3;
     }
 
-    int16_t yawInput = joyH;
+    int16_t yawInput = joy1H;
 
     if (yawDirectMode) {
         esc.yaw = yawInput * 1000 / 127;
@@ -43,7 +43,7 @@ esc_objective_attr TargetOrientationNav::nextFrame(TIME_INT_t intervalMicros) {
         esc.yaw = yawPID.apply(currentOrientation.yaw, targetOrientation.yaw, intervalMicros / MICROS_PER_MILLI, yawState);
     }
 
-    int16_t pitchInput = joyV;
+    int16_t pitchInput = joy1V;
 
     if (pitchDirectMode) {
         esc.pitch = pitchInput * 1000 / 127;
@@ -54,7 +54,7 @@ esc_objective_attr TargetOrientationNav::nextFrame(TIME_INT_t intervalMicros) {
         esc.pitch = pitchPID.apply(currentOrientation.pitch, targetOrientation.pitch, intervalMicros / MICROS_PER_MILLI, pitchState);
     }
     
-    esc.throttle = (slideV * NAV_INPUT_THROTTLE_SCALE) / 255;
+    esc.throttle = (joy2V * NAV_INPUT_THROTTLE_SCALE) / 255;
 
 #ifdef NAV_TRACE
     if (nav_trace_counter % NAV_TRACE_EVERY == 0) {
@@ -78,7 +78,7 @@ esc_objective_attr TargetOrientationNav::nextFrame(TIME_INT_t intervalMicros) {
     return esc;
 }
 
-void TargetOrientationNav::activateESCEvent() {
+void TargetOrientationNav::activateESCEvent(bool activated) {
     FDOS_LOG.printf("Syncing target orientation to current : yaw %i pitch %i roll %i\n", currentOrientation.yaw, currentOrientation.pitch,
                     currentOrientation.roll);
     targetOrientation = currentOrientation;

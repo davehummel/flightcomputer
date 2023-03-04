@@ -18,6 +18,7 @@ class PID {
         : kP(kP), kI(kI), kD(kD), maxOutput(maxOutput), period(period), maxIntegral(maxIntegralComponent/kI) {}
 
     int32_t apply(int32_t input, int32_t target, int32_t intervalMicros, pid_state_t *sample = 0);
+    
     void reset() {
         integral = 0;
         derivative = 0;

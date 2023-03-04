@@ -8,6 +8,7 @@
 #include "USFSMAX.h"
 #include "VMExecutor.h"
 #include "VMTime.h"
+#include "PowerControl.h"
 
 #include "FlightMessages.h"
 #include <FlightRadio.h>
@@ -19,6 +20,7 @@
 // #include "TestNav.h"
 
 Logger FDOS_LOG(&Serial);
+
 
 SX1276 RADIO = new Module(RADIO_CS_PIN, RADIO_DIO0_PIN, RADIO_RST_PIN, RADIO_DIO1_PIN, SPI, SPISettings(SPI_RADIO_FREQ, MSBFIRST, SPI_MODE0));
 
@@ -33,6 +35,8 @@ RadioTask RADIOTASK(&RADIO);
 TargetOrientationNav nav(&esc, &motionSensor);
 // DirectInputNav nav(&esc, &motionSensor);  // Test Nav
 
+
+
 void radioInterrupt(void) { RADIOTASK.interruptTriggered(); }
 
 void startRadioActions();
@@ -42,33 +46,13 @@ void startRadioActions() {
     RADIOTASK.addAction((RadioAction *)&listenTransmitterAction);
 }
 
-class PowerTestTask : RunnableTask {
-  public:
-    float rawVlt;
-    uint8_t batV;
-    bool buttonPressed;
-
-    void run(TIME_INT_t time) {
-        buttonPressed = analogRead(BUTTON_SENSE_PIN) > BUTTON_PRESS_THRESHOLD;
-        if (buttonPressed)
-            FDOS_LOG.println("Button Down!");
-
-        uint16_t rawv = analogRead(BATTERY_SENSE_PIN);
-
-        uint16_t rawc = analogRead(CURRENT_SENSE_PIN);
-
-        FDOS_LOG.printf("Voltage:%i current:%i\n", rawv, rawc);
-    }
-
-} powerTask;
 
 void setup() {
-    analogReadResolution(ANALOG_READ_RESOLUTION);
-    analogReadAveraging(ANALOG_READ_AVERAGING);
+
     Serial.begin(921600);
     pinMode(LED_PIN, OUTPUT);
     digitalWrite(LED_PIN, LOW);
-    pinMode(BATTERY_SENSE_PIN, INPUT_PULLUP);
+
     pinMode(BUTTON_SENSE_PIN, INPUT_PULLDOWN);
 #ifdef USB_SERIAL_HID
     Joystick.begin();
@@ -83,7 +67,7 @@ void setup() {
 
     delay(2000);
 
-    EXECUTOR.schedule((RunnableTask *)&powerTask, VMExecutor::getTimingPair(1, FrequencyUnitEnum::second));
+    POWER.start();
 
     Serial.println("[SX1276] Initializing ...");
     SPI.begin();

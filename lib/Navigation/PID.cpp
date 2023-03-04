@@ -18,6 +18,7 @@ int32_t PID::apply(int32_t state, int32_t target, int32_t intervalMillis, pid_st
 
     // running average with weight on history values
     int32_t observedChange = prevState - state;
+    
     if (period != 0) {
         observedChange = convertPeriodicError(observedChange, period);
     }

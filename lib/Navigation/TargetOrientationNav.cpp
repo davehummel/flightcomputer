@@ -90,7 +90,4 @@ void TargetOrientationNav::activateESCEvent(bool activated) {
     esc.roll = 0;
     esc.throttle = 0;
     esc.yaw = 0;
-    // targetOrientation.roll = currentOrientation.roll;
-    // targetOrientation.pitch = currentOrientation.pitch;
-    // targetOrientation.yaw = currentOrientation.yaw;
 }

@@ -104,8 +104,8 @@ void ESC::setMotorObjective(esc_objective_attr force) {
     } else {
         int32_t rawThrottles[MOTOR_COUNT] = {0};
 
-        int32_t pitchOffset = (force.pitch * PITCH_FACTOR); // input expressed in the -100 to +100 then scaled by that input factor
-        int32_t yawOffset = (force.yaw * YAW_FACTOR);       // The final results will be divided by 100 to scale back down
+        int32_t pitchOffset = (force.pitch * PITCH_FACTOR); // input expressed in the -1000 to +1000 then scaled by that input factor
+        int32_t yawOffset = (force.yaw * YAW_FACTOR);       // The final results will be divided by 1000 to scale back down
         int32_t rollOffset = (force.roll * ROLL_FACTOR);
 
         /*
@@ -149,6 +149,7 @@ void ESC::setMotorObjective(esc_objective_attr force) {
 
         // TODO consider scaling total power output to be equivelent to throttle selection.
         //   Currently, in low throttle situations, strong esc objectives will create extra throttle
+        //   This is probably good, gives command authority at low speed
 
         if (rawThrottles[0] < 0)
             rawThrottles[0] = 0;

@@ -1,4 +1,5 @@
 #include "FlightRadio.h"
+#include "PowerControl.h"
 
 ListenTransmitterAction listenTransmitterAction = ListenTransmitterAction();
 SustainConnectionAction sustainConnectionAction = SustainConnectionAction();
@@ -151,20 +152,16 @@ void SustainConnectionAction::onReceive(uint8_t length, uint8_t *data, bool resp
 uint8_t SustainConnectionAction::onSendReady(uint8_t *data, bool &responseExpected) {
     digitalWrite(LED_PIN, hbLedFlip = !hbLedFlip);
 
-    uint16_t raw = analogRead(BATTERY_SENSE_PIN);
-    receiverState.batV = raw;
-    raw = analogRead(CURRENT_SENSE_PIN);
-    receiverState.cur = raw;
-
-    FDOS_LOG.printf("Voltage:%i current:%i\n", receiverState.batV , receiverState.cur );
+    receiverState.batV = POWER.getBatteryVoltage();
+    receiverState.cur = POWER.getBatteryCurrent();
 
     float snr = RADIO.getSNR();
     receiverState.snr = snr * 10;
 
-    receiverState.headings[0] = convertHeading(nav->currentOrientation.yaw);
-    receiverState.headings[1] = convertHeading(nav->currentOrientation.pitch);
-    receiverState.headings[2] = convertHeading(nav->currentOrientation.roll);
-    receiverState.pressure = convertPressure(nav->currentPressure);
+    receiverState.headings[0] = nav->currentOrientation.yaw;
+    receiverState.headings[1] = nav->currentOrientation.pitch;
+    receiverState.headings[2] = nav->currentOrientation.roll;
+    receiverState.pressure = nav->currentPressure;
 
     receiverState.targetHeadings[0] = nav->targetOrientation.yaw;
     receiverState.targetHeadings[1] = nav->targetOrientation.pitch;

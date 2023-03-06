@@ -29,6 +29,7 @@ class ListenTransmitterAction : RadioAction, RunnableTask {
 
 class SustainConnectionAction : RadioAction, RunnableTask {
   private:
+
     ScheduledLink *cancel = NULL;
 
     receiver_heartbeat_t receiverState;
@@ -40,6 +41,8 @@ class SustainConnectionAction : RadioAction, RunnableTask {
     TIME_INT_t lastReceivedTime = 0;
  
     TargetOrientationNav *nav; 
+
+    char inErrorState[254]  = "\0";
 
 
   public:

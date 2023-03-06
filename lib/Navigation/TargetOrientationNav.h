@@ -14,15 +14,18 @@ class TargetOrientationNav : public GenericNavTask {
         if (yaw)
             targetOrientation.yaw = currentOrientation.yaw;
         if (pitch)
-            targetOrientation.yaw = currentOrientation.yaw;
+            targetOrientation.pitch = currentOrientation.pitch;
         if (roll)
-            targetOrientation.yaw = currentOrientation.yaw;
+            targetOrientation.roll = currentOrientation.roll;
     }
 
     void setControlMode(bool yawDirect, bool pitchDirect, bool rollDirect) {
-        bool resetYawOrientation = yawDirect && !yawDirectMode;
-        bool resetPitchOrientation = pitchDirect && !pitchDirectMode;
-        bool resetRollOrientation = rollDirect && !rollDirectMode;
+        bool resetYawOrientation = yawDirect != yawDirectMode;
+        bool resetPitchOrientation = pitchDirect != pitchDirectMode;
+        bool resetRollOrientation = rollDirect != rollDirectMode;
+
+        if (!(resetYawOrientation||resetPitchOrientation||resetRollOrientation))
+          return;
 
         yawDirectMode = yawDirect;
         pitchDirectMode = pitchDirect;
@@ -33,6 +36,10 @@ class TargetOrientationNav : public GenericNavTask {
         FDOS_LOG.printf("Setting direct control on Y:%i,P:%i,R:%i\n", yawDirect, pitchDirect, rollDirect);
     }
 
+    void updatePIDConfiguration(double yaw_KP, double yaw_KI, double yaw_KD,int32_t yaw_MAX_I, 
+                                double roll_KP, double roll_KI, double roll_KD,int32_t roll_MAX_I, 
+                                double pitch_KP, double pitch_KI, double pitch_KD,int32_t pitch_MAX_I );
+
   protected:
     void activateESCEvent(bool activated);
 
@@ -42,12 +49,9 @@ class TargetOrientationNav : public GenericNavTask {
     bool yawDirectMode = false, pitchDirectMode = false, rollDirectMode = false;
     bool yawAssistRollMode = false;
 
-    PID yawPID = PID(PID_YAW_KP, PID_YAW_KI, PID_YAW_KD, PID_YAW_MAXOUT, PID_YAW_INPERIOD, PID_YAW_MAXINTEGRAL);
-    // PID yawPID = PID(0.0,0.0,0.0,1000,__UINT16_MAX__,400);
-    PID rollPID = PID(PID_ROLL_KP, PID_ROLL_KI, PID_ROLL_KD, PID_ROLL_MAXOUT, PID_ROLL_INPERIOD, PID_ROLL_MAXINTEGRAL);
-    // PID rollPID = PID(0.0,0.0,0.0 ,1000,__UINT16_MAX__,400);
-    PID pitchPID = PID(PID_PITCH_KP, PID_PITCH_KI, PID_PITCH_KD, PID_PITCH_MAXOUT, PID_PITCH_INPERIOD, PID_PITCH_MAXINTEGRAL);
-    // PID pitchPID = PID(0.0,0.0,0.0,1000,__UINT16_MAX__,400);
+    PID yawPID;
+    PID rollPID;
+    PID pitchPID;
 };
 
 #endif

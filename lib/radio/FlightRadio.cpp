@@ -126,17 +126,40 @@ void SustainConnectionAction::onReceive(uint8_t length, uint8_t *data, bool resp
 
     if (data[0] == RADIO_MSG_ID::TRANSMITTER_HEARTBEAT) {
         lastReceivedTime = microsSinceEpoch();
-        msgFromBytes(&transmitterState, data, transmitter_heartbeat_t::size);
-        FDOS_LOG.printf("HB heard! size = %i.  enabled = %i\n",length,transmitterState.flightModeEnabled);
+        msgFromBytes(&transmitterState, data, sizeof(transmitter_heartbeat_t));
+        FDOS_LOG.println("HB heard!");
+        transmitterState.print(&FDOS_LOG);
         nav->connectESC(transmitterState.flightModeEnabled);
         nav->setControlMode(transmitterState.isDirectYaw(), transmitterState.isDirectPitch(), transmitterState.isDirectRoll());
-  
+        return;
+    }
+
+    if (data[0] == RADIO_MSG_ID::FLIGHT_CONFIG) {
+       
+        lastReceivedTime = microsSinceEpoch();
+        flight_config_t config;
+        msgFromBytes(&config, data, sizeof(flight_config_t));
+ 
+        lastReceivedTime = microsSinceEpoch();
+
+        FDOS_LOG.println("Config Received!");
+        config.print(&FDOS_LOG);
+        if (config.pitch_MAX_I!=100){
+            sprintf(inErrorState,"Bad pitch_Max_I:%ld",config.pitch_MAX_I);
+            for (uint8_t i = 0 ; i <20 ; i++){
+                delay(100);
+                digitalWrite(LED_PIN,i%2);
+            }
+            requestSend();
+        }
+        nav->updatePIDConfiguration(config.yaw_KP, config.yaw_KI, config.yaw_KD, config.yaw_MAX_I, config.roll_KP, config.roll_KI, config.roll_KD,
+                                    config.roll_MAX_I, config.pitch_KP, config.pitch_KI, config.pitch_KD, config.pitch_MAX_I);
         return;
     }
 
     if (data[0] == RADIO_MSG_ID::FLIGHT_INPUT) {
         lastReceivedTime = microsSinceEpoch();
-        msgFromBytes(&inputState, data, flight_input_t::size);
+        msgFromBytes(&inputState, data, sizeof(flight_input_t));
         nav->recordInput(inputState.joyH, inputState.joyV, inputState.slideH, inputState.throttleInput);
 #ifdef USB_SERIAL_HID
         inputState.print(&FDOS_LOG);
@@ -150,6 +173,13 @@ void SustainConnectionAction::onReceive(uint8_t length, uint8_t *data, bool resp
 }
 
 uint8_t SustainConnectionAction::onSendReady(uint8_t *data, bool &responseExpected) {
+    if (inErrorState[0]!='\0'){
+        data[0] = CRITICAL_MESSAGE;
+        strcpy((char*)(data+1),inErrorState);
+        inErrorState[0] = '\0';
+        disconnect();
+        return strlen((char*)(data+1))+1;
+    }
     digitalWrite(LED_PIN, hbLedFlip = !hbLedFlip);
 
     receiverState.batV = POWER.getBatteryVoltage();
@@ -175,11 +205,11 @@ uint8_t SustainConnectionAction::onSendReady(uint8_t *data, bool &responseExpect
     FDOS_LOG.println("HB response:");
     receiverState.print((Print *)&FDOS_LOG);
 
-    msgToBytes(&receiverState, data, receiver_heartbeat_t::size);
+    msgToBytes(&receiverState, data, sizeof(receiver_heartbeat_t));
 
     responseExpected = true;
 
-    return receiver_heartbeat_t::size;
+    return sizeof(receiver_heartbeat_t);
 }
 
 void SustainConnectionAction::run(TIME_INT_t time) {

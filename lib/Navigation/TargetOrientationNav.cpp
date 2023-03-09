@@ -47,7 +47,7 @@ esc_objective_attr TargetOrientationNav::nextFrame(TIME_INT_t intervalMicros) {
         bool hardRollInput = abs(rollInput < NAV_INPUT_ROLL_DIRECT_THRESHOLD);
         rollInput = rollInput * NAV_INPUT_ROLL_SCALE / 255;
         targetOrientation.roll = (hardRollInput ? targetOrientation.roll : currentOrientation.roll) + rollInput;
-        esc.roll = (2 * esc.roll + rollPID.apply(currentOrientation.roll, targetOrientation.roll, intervalMicros / MICROS_PER_MILLI, rollState)) / 3;
+        esc.roll = rollPID.apply(currentOrientation.roll, targetOrientation.roll, intervalMicros / MICROS_PER_MILLI, rollState);
     }
 
     int16_t yawInput = joy1H;

@@ -43,15 +43,28 @@ class ESC {
         TIME_INT_t getNextInterval(TIME_INT_t lastInterval);
     };
 
-    VMExecutor *executor;
+    class DirectESCTask : public RunnableTask {
 
-    InitMotorTask initTask;
+        uint8_t initStep = 0;
+        ESC *parent;
+
+      public:
+        DirectESCTask(ESC *_parent) : parent(_parent) {}
+
+        void run(TIME_INT_t time) { parent->setAllSpeeds(0); }
+
+    };
+
+    VMExecutor *executor;
 
     uint8_t motorPins[MOTOR_COUNT] = MOTOR_PINS_FROM_BACK_TL_TR_BL_BR;
 
     uint16_t speeds[MOTOR_COUNT] = {0};
 
     void setAllSpeeds(uint16_t speed);
+
+    InitMotorTask initTask;
+    DirectESCTask directTask;
 
   public:
     uint16_t THROTTLE_FACTOR = MOTOR_THROTTLE_FACTOR;
@@ -65,6 +78,8 @@ class ESC {
     void setMotorDirect(uint8_t motorNum, uint16_t speed);
 
     void setMotorObjective(esc_objective_attr force);
+
+    void runESCDirectCommand(uint8_t time, uint16_t *motors);
 
     ESC(VMExecutor *_executor);
 

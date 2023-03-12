@@ -100,7 +100,7 @@ uint8_t ListenTransmitterAction::onSendReady(uint8_t *data, bool &responseExpect
 void SustainConnectionAction::onStart() {
     if (cancel != NULL)
         cancel->cancel();
-    cancel = EXECUTOR.schedule((RunnableTask *)this, EXECUTOR.getTimingPair(RECEIVER_HB_ABANDON_MICROS / 4, FrequencyUnitEnum::micro));
+    cancel = EXECUTOR.schedule((RunnableTask *)this, EXECUTOR.getTimingPair(1, FrequencyUnitEnum::second));
     lastReceivedTime = microsSinceEpoch();
     FDOS_LOG.println("Sustain connection starting...");
 }
@@ -135,25 +135,34 @@ void SustainConnectionAction::onReceive(uint8_t length, uint8_t *data, bool resp
     }
 
     if (data[0] == RADIO_MSG_ID::FLIGHT_CONFIG) {
-       
+
         lastReceivedTime = microsSinceEpoch();
         flight_config_t config;
         msgFromBytes(&config, data, sizeof(flight_config_t));
- 
-        lastReceivedTime = microsSinceEpoch();
 
         FDOS_LOG.println("Config Received!");
         config.print(&FDOS_LOG);
-        if (config.pitch_MAX_I!=100){
-            sprintf(inErrorState,"Bad pitch_Max_I:%ld",config.pitch_MAX_I);
-            for (uint8_t i = 0 ; i <20 ; i++){
-                delay(100);
-                digitalWrite(LED_PIN,i%2);
-            }
-            requestSend();
-        }
+
         nav->updatePIDConfiguration(config.yaw_KP, config.yaw_KI, config.yaw_KD, config.yaw_MAX_I, config.roll_KP, config.roll_KI, config.roll_KD,
                                     config.roll_MAX_I, config.pitch_KP, config.pitch_KI, config.pitch_KD, config.pitch_MAX_I);
+        return;
+    }
+
+    if (data[0] == RADIO_MSG_ID::DIRECT_ESC) {
+        lastReceivedTime = microsSinceEpoch();
+        direct_esc_t escCommand;
+
+        msgFromBytes(&escCommand, data, sizeof(direct_esc_t));
+        FDOS_LOG.println("Direct ESC Received!");
+        escCommand.print(&FDOS_LOG);
+
+        uint16_t speeds[4];
+        for (uint8_t i = 0; i < 4; i++) {
+            speeds[i] = escCommand.escVals[i] * (1000.0 / 255.0);
+        }
+
+        nav->getESC()->runESCDirectCommand(escCommand.commandDurationSeconds, speeds);
+
         return;
     }
 
@@ -173,12 +182,12 @@ void SustainConnectionAction::onReceive(uint8_t length, uint8_t *data, bool resp
 }
 
 uint8_t SustainConnectionAction::onSendReady(uint8_t *data, bool &responseExpected) {
-    if (inErrorState[0]!='\0'){
+    if (inErrorState[0] != '\0') {
         data[0] = CRITICAL_MESSAGE;
-        strcpy((char*)(data+1),inErrorState);
+        strcpy((char *)(data + 1), inErrorState);
         inErrorState[0] = '\0';
         disconnect();
-        return strlen((char*)(data+1))+1;
+        return strlen((char *)(data + 1)) + 1;
     }
     digitalWrite(LED_PIN, hbLedFlip = !hbLedFlip);
 

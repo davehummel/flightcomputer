@@ -38,6 +38,13 @@ TIME_INT_t ESC::InitMotorTask::getNextInterval(TIME_INT_t lastInterval) {
     }
 }
 
+void ESC::runESCDirectCommand(uint8_t time, uint16_t *motors){
+    executor->schedule(&directTask,time*MICROS_PER_SECOND,-1);
+    for (uint8_t i = 0; i < MOTOR_COUNT; i++) {
+        setMotorDirect(i, motors[i]);
+    }
+}
+
 void ESC::setAllSpeeds(uint16_t speed) {
     if (speed > 1000)
         speed = 1000;
@@ -71,7 +78,7 @@ void ESC::setMotorDirect(uint8_t motorNum, uint16_t speed) {
 #endif
 }
 
-ESC::ESC(VMExecutor *_executor) : executor(_executor), initTask(this) {
+ESC::ESC(VMExecutor *_executor) : executor(_executor), initTask(this) , directTask(this){
 #if defined(TEENSYDUINO)
     analogWriteResolution(14);
     for (uint8_t i = 0; i < MOTOR_COUNT; i++) {

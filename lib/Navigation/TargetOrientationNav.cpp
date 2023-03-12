@@ -107,4 +107,5 @@ void TargetOrientationNav::activateESCEvent(bool activated) {
     esc.roll = 0;
     esc.throttle = 0;
     esc.yaw = 0;
+
 }

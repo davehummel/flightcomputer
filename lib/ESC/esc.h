@@ -51,7 +51,7 @@ class ESC {
       public:
         DirectESCTask(ESC *_parent) : parent(_parent) {}
 
-        void run(TIME_INT_t time) { parent->setAllSpeeds(0); }
+        void run(TIME_INT_t time);
 
     };
 
@@ -65,6 +65,8 @@ class ESC {
 
     InitMotorTask initTask;
     DirectESCTask directTask;
+
+    bool directLock = false;
 
   public:
     uint16_t THROTTLE_FACTOR = MOTOR_THROTTLE_FACTOR;

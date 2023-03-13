@@ -38,8 +38,18 @@ TIME_INT_t ESC::InitMotorTask::getNextInterval(TIME_INT_t lastInterval) {
     }
 }
 
-void ESC::runESCDirectCommand(uint8_t time, uint16_t *motors){
-    executor->schedule(&directTask,time*MICROS_PER_SECOND,-1);
+void ESC::DirectESCTask::run(TIME_INT_t time) {
+    parent->directLock = false;
+    parent->setAllSpeeds(0);
+}
+
+void ESC::runESCDirectCommand(uint8_t time, uint16_t *motors) {
+
+    FDOS_LOG.printf("ESC Direct command [%i,%i,%i,%i] for %i seconds.\n", motors[0], motors[1], motors[2], motors[3], time);
+    directLock = true;
+
+    executor->schedule(&directTask, time * MICROS_PER_SECOND, -1);
+
     for (uint8_t i = 0; i < MOTOR_COUNT; i++) {
         setMotorDirect(i, motors[i]);
     }
@@ -55,14 +65,13 @@ void ESC::setAllSpeeds(uint16_t speed) {
 
 void ESC::initMotors() {
     setAllSpeeds(0);
-     // This will only be needed for ESC that have initialize throttle process 
-    FDOS_LOG.print("PWM ESC init Started.");
+    // This will only be needed for ESC that have initialize throttle process
+    FDOS_LOG.println("PWM ESC init Started.");
     executor->schedule(&initTask, 1, 1);
-    
 }
 
-uint16_t MIN_PMW = 16383/20-2;
-uint16_t MAX_PMW = 16383/10+2;
+uint16_t MIN_PMW = 16383 / 20 - 2;
+uint16_t MAX_PMW = 16383 / 10 + 2;
 
 void ESC::setMotorDirect(uint8_t motorNum, uint16_t speed) {
     if (motorNum >= MOTOR_COUNT)
@@ -72,13 +81,13 @@ void ESC::setMotorDirect(uint8_t motorNum, uint16_t speed) {
 
     speeds[motorNum] = speed;
 #if defined(TEENSYDUINO)
-    analogWrite(motorPins[motorNum],map(speed,0,1000,MIN_PMW,MAX_PMW));
+    analogWrite(motorPins[motorNum], map(speed, 0, 1000, MIN_PMW, MAX_PMW));
 #else
     servos[motorNum].writeMicroseconds(1000 + speed);
 #endif
 }
 
-ESC::ESC(VMExecutor *_executor) : executor(_executor), initTask(this) , directTask(this){
+ESC::ESC(VMExecutor *_executor) : executor(_executor), initTask(this), directTask(this) {
 #if defined(TEENSYDUINO)
     analogWriteResolution(14);
     for (uint8_t i = 0; i < MOTOR_COUNT; i++) {
@@ -105,6 +114,8 @@ uint16_t esc_trace_count = 0;
 #endif
 
 void ESC::setMotorObjective(esc_objective_attr force) {
+    if (directLock) // motors are overridden for direct control
+        return;
     if (force.pitch == 0 && force.roll == 0 && force.yaw == 0) {
         // Handle trivial case first (would break during scaling)
         setAllSpeeds(((uint32_t)force.throttle * THROTTLE_FACTOR) / 1000);

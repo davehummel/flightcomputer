@@ -39,58 +39,73 @@ void TargetOrientationNav::updatePIDConfiguration(double yaw_KP, double yaw_KI, 
 
 esc_objective_attr TargetOrientationNav::nextFrame(TIME_INT_t intervalMicros) {
 
+#ifdef NAV_TRACE
+    bool doTrace = (nav_trace_counter % NAV_TRACE_EVERY == 0);
+
+    nav_trace_counter++;
+#endif
+
     int16_t rollInput = joy2H;
 
     if (rollDirectMode) {
         esc.roll = (rollInput * 1000) / 127;
+#ifdef NAV_TRACE_ROLL_PID
+        if (doTrace)
+            FDOS_LOG.printf("Direct RLL S:%i\n", esc.roll);
+#endif
     } else {
         bool hardRollInput = abs(rollInput < NAV_INPUT_ROLL_DIRECT_THRESHOLD);
         rollInput = rollInput * NAV_INPUT_ROLL_SCALE / 255;
         targetOrientation.roll = (hardRollInput ? targetOrientation.roll : currentOrientation.roll) + rollInput;
         esc.roll = rollPID.apply(currentOrientation.roll, targetOrientation.roll, intervalMicros / MICROS_PER_MILLI, rollState);
+#ifdef NAV_TRACE_ROLL_PID
+        if (doTrace)
+            FDOS_LOG.printf("RLL_PID S:%i T:%i O:%i I:%i D:%i pC:%i iC:%i dC:%i \n", rollState->state, rollState->target, rollState->output,
+                            rollState->integral, rollState->derivative, rollState->pContribution, rollState->iContribution, rollState->dContribution);
+#endif
     }
 
     int16_t yawInput = joy1H;
 
     if (yawDirectMode) {
         esc.yaw = yawInput * 1000 / 127;
+#ifdef NAV_TRACE_YAW_PID
+        if (doTrace)
+            FDOS_LOG.printf("Direct YAW S:%i\n", esc.yaw);
+#endif
     } else {
         bool hardYawInput = abs(yawInput < NAV_INPUT_YAW_DIRECT_THRESHOLD);
         yawInput = yawInput * NAV_INPUT_YAW_SCALE / 255;
         targetOrientation.yaw = (hardYawInput ? targetOrientation.yaw : currentOrientation.yaw) + yawInput;
         esc.yaw = yawPID.apply(currentOrientation.yaw, targetOrientation.yaw, intervalMicros / MICROS_PER_MILLI, yawState);
+#ifdef NAV_TRACE_YAW_PID
+        if (doTrace)
+            FDOS_LOG.printf("YAW_PID S:%i T:%i O:%i I:%i D:%i pC:%i iC:%i dC:%i \n", yawState->state, yawState->target, yawState->output, yawState->integral,
+                            yawState->derivative, yawState->pContribution, yawState->iContribution, yawState->dContribution);
+#endif
     }
 
-    int16_t pitchInput = joy1V;
+    int16_t pitchInput = -joy1V;
 
     if (pitchDirectMode) {
         esc.pitch = pitchInput * 1000 / 127;
+#ifdef NAV_TRACE_PITCH_PID
+        if (doTrace)
+            FDOS_LOG.printf("Direct PCH S:%i\n", esc.pitch);
+#endif
     } else {
         bool hardPitchInput = abs(pitchInput < NAV_INPUT_PITCH_DIRECT_THRESHOLD);
         pitchInput = pitchInput * NAV_INPUT_PITCH_SCALE / 255;
         targetOrientation.pitch = (hardPitchInput ? targetOrientation.pitch : currentOrientation.pitch) + pitchInput;
         esc.pitch = pitchPID.apply(currentOrientation.pitch, targetOrientation.pitch, intervalMicros / MICROS_PER_MILLI, pitchState);
+#ifdef NAV_TRACE_PITCH_PID
+        if (doTrace)
+            FDOS_LOG.printf("PCH_PID S:%i T:%i O:%i I:%i D:%i pC:%i iC:%i dC:%i \n", pitchState->state, pitchState->target, pitchState->output,
+                            pitchState->integral, pitchState->derivative, pitchState->pContribution, pitchState->iContribution, pitchState->dContribution);
+#endif
     }
 
     esc.throttle = (joy2V * NAV_INPUT_THROTTLE_SCALE) / 255;
-
-#ifdef NAV_TRACE
-    if (nav_trace_counter % NAV_TRACE_EVERY == 0) {
-#ifdef NAV_TRACE_YAW_PID
-        FDOS_LOG.printf("YAW_PID S:%i T:%i O:%i I:%i D:%i pC:%i iC:%i dC:%i \n", yawState->state, yawState->target, yawState->output, yawState->integral,
-                        yawState->derivative, yawState->pContribution, yawState->iContribution, yawState->dContribution);
-#endif
-#ifdef NAV_TRACE_ROLL_PID
-        FDOS_LOG.printf("RLL_PID S:%i T:%i O:%i I:%i D:%i pC:%i iC:%i dC:%i \n", rollState->state, rollState->target, rollState->output, rollState->integral,
-                        rollState->derivative, rollState->pContribution, rollState->iContribution, rollState->dContribution);
-#endif
-#ifdef NAV_TRACE_PITCH_PID
-        FDOS_LOG.printf("RLL_PID S:%i T:%i O:%i I:%i D:%i pC:%i iC:%i dC:%i \n", pitchState->state, pitchState->target, pitchState->output,
-                        pitchState->integral, pitchState->derivative, pitchState->pContribution, pitchState->iContribution, pitchState->dContribution);
-#endif
-    }
-    nav_trace_counter++;
-#endif
 
     return esc;
 }
@@ -107,5 +122,4 @@ void TargetOrientationNav::activateESCEvent(bool activated) {
     esc.roll = 0;
     esc.throttle = 0;
     esc.yaw = 0;
-
 }

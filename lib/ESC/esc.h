@@ -20,7 +20,7 @@ struct esc_objective_attr {
 
 class ESC {
     /**
-     * @brief ESC for four motors with an assumed layout of
+     * @brief ESC for four motors with an assumed layout (looking from the back) of
      *                            0 CC 1 CW      0 CW 1 CC
      *                            2 CW 3 CC  or  2 CC 3 CW
      *   MOTOR_CONFIG_TL_CLOCKWISE    0              1

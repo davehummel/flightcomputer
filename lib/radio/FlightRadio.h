@@ -10,7 +10,6 @@ class ListenTransmitterAction : RadioAction, RunnableTask {
   private:
     ScheduledLink *cancel = NULL;
     uint8_t transmitterId = 0;
-
     uint8_t respondAttempt = 0;
 
   public:
@@ -39,6 +38,8 @@ class SustainConnectionAction : RadioAction, RunnableTask {
     flight_input_t inputState;
 
     TIME_INT_t lastReceivedTime = 0;
+
+    int32_t telemRequestIndex = -1;
  
     TargetOrientationNav *nav; 
 

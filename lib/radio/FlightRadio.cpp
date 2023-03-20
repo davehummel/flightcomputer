@@ -148,6 +148,34 @@ void SustainConnectionAction::onReceive(uint8_t length, uint8_t *data, bool resp
         return;
     }
 
+    if (data[0] == RADIO_MSG_ID::PID_TELEMETRY) {
+
+        lastReceivedTime = microsSinceEpoch();
+        pid_set_telemetry_t config;
+        msgFromBytes(&config, data, sizeof(pid_set_telemetry_t));
+
+        FDOS_LOG.println("Telemetry switch received!");
+        config.print(&FDOS_LOG);
+
+        nav->setTelemCapture(config.enable);
+
+        return;
+    }
+
+    if (data[0] == RADIO_MSG_ID::PID_TELEMETRY_REQUEST) {
+
+        lastReceivedTime = microsSinceEpoch();
+        pid_request_telemetry_t config;
+        msgFromBytes(&config, data, sizeof(pid_request_telemetry_t));
+
+        FDOS_LOG.println("Telemetry request received!");
+        config.print(&FDOS_LOG);
+
+        telemRequestIndex = config.index;
+
+        return;
+    }
+
     if (data[0] == RADIO_MSG_ID::DIRECT_ESC) {
         lastReceivedTime = microsSinceEpoch();
         direct_esc_t escCommand;
@@ -182,6 +210,8 @@ void SustainConnectionAction::onReceive(uint8_t length, uint8_t *data, bool resp
 }
 
 uint8_t SustainConnectionAction::onSendReady(uint8_t *data, bool &responseExpected) {
+    digitalWrite(LED_PIN, hbLedFlip = !hbLedFlip);
+
     if (inErrorState[0] != '\0') {
         data[0] = CRITICAL_MESSAGE;
         strcpy((char *)(data + 1), inErrorState);
@@ -189,7 +219,26 @@ uint8_t SustainConnectionAction::onSendReady(uint8_t *data, bool &responseExpect
         disconnect();
         return strlen((char *)(data + 1)) + 1;
     }
-    digitalWrite(LED_PIN, hbLedFlip = !hbLedFlip);
+
+    if (telemRequestIndex != -1) {
+        responseExpected = false;
+
+        data[0] = PID_TELEMETRY_RESPONSE;
+
+        int32_t maxRecordedIndex = nav->getMaxRecordedTelemIndex();
+        int32_t length = telemRequestIndex - maxRecordedIndex;
+
+        if (length < 1)
+            length = 0;
+        else if (length > 5)
+            length = 5;
+
+        data[1] = length;
+
+            pid_state_t *statesData;
+
+        telemRequestIndex = -1;
+    }
 
     receiverState.batV = POWER.getBatteryVoltage();
     receiverState.cur = POWER.getBatteryCurrent();

@@ -35,19 +35,21 @@ void TargetOrientationNav::updatePIDConfiguration(double yaw_KP, double yaw_KI, 
 
 esc_objective_attr TargetOrientationNav::nextFrame(TIME_INT_t intervalMicros) {
 
+    uint16_t intervalMillis = intervalMicros / MICROS_PER_MILLI;
+
 #ifdef NAV_TRACE
     bool doTrace = (nav_trace_counter % NAV_TRACE_EVERY == 0);
     if (doTrace)
         nav_trace_counter = 0;
-    else
-        nav_trace_counter++;
+
+    nav_trace_counter++;
 #endif
 
     bool doTelem = (nav_trace_counter % NAV_TELEM_EVERY == 0);
     if (doTelem)
         nav_telem_skip_counter = 0;
-    else
-        nav_telem_skip_counter++;
+
+    nav_telem_skip_counter++;
 
     if (doTelem && telemCaptureEnabled) {
         uint32_t index = telemSampleIndex % NAV_TELEM_SAMPLES;
@@ -60,7 +62,21 @@ esc_objective_attr TargetOrientationNav::nextFrame(TIME_INT_t intervalMicros) {
         if (telemSampleIndex == NAV_TELEM_SAMPLES * 2) {
             telemSampleIndex = telemSampleIndex;
         }
+    } else {
+        yawState = NULL;
+        pitchState = NULL;
+        rollState = NULL;
     }
+#ifdef NAV_TRACE
+    pid_state_t traceTempState;
+    if (doTrace && yawState == NULL)
+        yawState = &traceTempState;
+    if (doTrace && pitchState == NULL)
+        pitchState = &traceTempState;
+    if (doTrace && rollState == NULL)
+        rollState = &traceTempState;
+
+#endif
 
     // YAW
 
@@ -68,6 +84,8 @@ esc_objective_attr TargetOrientationNav::nextFrame(TIME_INT_t intervalMicros) {
 
     if (yawDirectMode) {
         esc.yaw = yawInput * 1000 / 127;
+        if (yawState != NULL)
+            yawState->zero();
 #ifdef NAV_TRACE_YAW_PID
         if (doTrace)
             FDOS_LOG.printf("Direct YAW S:%i\n", esc.yaw);
@@ -76,11 +94,11 @@ esc_objective_attr TargetOrientationNav::nextFrame(TIME_INT_t intervalMicros) {
         bool hardYawInput = abs(yawInput < NAV_INPUT_YAW_DIRECT_THRESHOLD);
         yawInput = yawInput * NAV_INPUT_YAW_SCALE / 255;
         targetOrientation.yaw = (hardYawInput ? targetOrientation.yaw : currentOrientation.yaw) + yawInput;
-        esc.yaw = yawPID.apply(currentOrientation.yaw, targetOrientation.yaw, intervalMicros / MICROS_PER_MILLI, yawState);
+        esc.yaw = yawPID.apply(currentOrientation.yaw, targetOrientation.yaw, intervalMillis, yawState);
 #ifdef NAV_TRACE_YAW_PID
         if (doTrace) {
             FDOS_LOG.print("YAW_PID:");
-            yawState->print(&FDOS_LOG, yawPID);
+            yawState->print(&FDOS_LOG, yawPID,intervalMillis);
         }
 #endif
     }
@@ -91,6 +109,8 @@ esc_objective_attr TargetOrientationNav::nextFrame(TIME_INT_t intervalMicros) {
 
     if (pitchDirectMode) {
         esc.pitch = pitchInput * 1000 / 127;
+        if (pitchState != NULL)
+            pitchState->zero();
 #ifdef NAV_TRACE_PITCH_PID
         if (doTrace)
             FDOS_LOG.printf("Direct PCH S:%i\n", esc.pitch);
@@ -99,11 +119,11 @@ esc_objective_attr TargetOrientationNav::nextFrame(TIME_INT_t intervalMicros) {
         bool hardPitchInput = abs(pitchInput < NAV_INPUT_PITCH_DIRECT_THRESHOLD);
         pitchInput = pitchInput * NAV_INPUT_PITCH_SCALE / 255;
         targetOrientation.pitch = (hardPitchInput ? targetOrientation.pitch : currentOrientation.pitch) + pitchInput;
-        esc.pitch = pitchPID.apply(currentOrientation.pitch, targetOrientation.pitch, intervalMicros / MICROS_PER_MILLI, pitchState);
+        esc.pitch = pitchPID.apply(currentOrientation.pitch, targetOrientation.pitch, intervalMillis, pitchState);
 #ifdef NAV_TRACE_PITCH_PID
         if (doTrace) {
             FDOS_LOG.print("PITCH_PID:");
-            pitchState->print(&FDOS_LOG, pitchPID);
+            pitchState->print(&FDOS_LOG, pitchPID,intervalMillis);
         }
 #endif
     }
@@ -114,6 +134,8 @@ esc_objective_attr TargetOrientationNav::nextFrame(TIME_INT_t intervalMicros) {
 
     if (rollDirectMode) {
         esc.roll = (rollInput * 1000) / 127;
+        if (rollState != NULL)
+            rollState->zero();
 #ifdef NAV_TRACE_ROLL_PID
         if (doTrace)
             FDOS_LOG.printf("Direct RLL S:%i\n", esc.roll);
@@ -122,11 +144,11 @@ esc_objective_attr TargetOrientationNav::nextFrame(TIME_INT_t intervalMicros) {
         bool hardRollInput = abs(rollInput < NAV_INPUT_ROLL_DIRECT_THRESHOLD);
         rollInput = rollInput * NAV_INPUT_ROLL_SCALE / 255;
         targetOrientation.roll = (hardRollInput ? targetOrientation.roll : currentOrientation.roll) + rollInput;
-        esc.roll = rollPID.apply(currentOrientation.roll, targetOrientation.roll, intervalMicros / MICROS_PER_MILLI, rollState);
+        esc.roll = rollPID.apply(currentOrientation.roll, targetOrientation.roll, intervalMillis, rollState);
 #ifdef NAV_TRACE_ROLL_PID
         if (doTrace) {
             FDOS_LOG.print("ROLL_PID:");
-            rollState->print(&FDOS_LOG, rollPID);
+            rollState->print(&FDOS_LOG, rollPID,intervalMillis);
         }
 #endif
     }
@@ -180,8 +202,12 @@ void TargetOrientationNav::setControlMode(bool yawDirect, bool pitchDirect, bool
 }
 
 void TargetOrientationNav::setTelemCapture(bool enabled) {
-    telemCaptureEnabled = enabled;
-    telemSampleIndex = 0;
+    if (telemCaptureEnabled != enabled) {
+        FDOS_LOG.print("Switching Telemetry ");
+        FDOS_LOG.println(enabled ? "On" : "Off");
+        telemCaptureEnabled = enabled;
+        telemSampleIndex = 0;
+    }
 }
 
 int32_t TargetOrientationNav::getMaxRecordedTelemIndex() {
@@ -191,15 +217,15 @@ int32_t TargetOrientationNav::getMaxRecordedTelemIndex() {
         return telemSampleIndex;
 }
 
-pid_state_t* TargetOrientationNav::getTelemSample(int32_t index){
+pid_state_t *TargetOrientationNav::getTelemSample(int32_t index) {
     int32_t maxIndex = getMaxRecordedTelemIndex();
-    if (index>maxIndex)
+    if (index > maxIndex)
         return NULL;
 
     index = telemSampleIndex - index;
 
-    if (index < 0) 
+    if (index < 0)
         index += NAV_TELEM_SAMPLES;
-    
-    return &telemSamples[telemSampleIndex*3];
+
+    return &telemSamples[telemSampleIndex * 3];
 }

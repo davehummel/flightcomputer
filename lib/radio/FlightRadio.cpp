@@ -131,6 +131,7 @@ void SustainConnectionAction::onReceive(uint8_t length, uint8_t *data, bool resp
         transmitterState.print(&FDOS_LOG);
         nav->connectESC(transmitterState.flightModeEnabled);
         nav->setControlMode(transmitterState.isDirectYaw(), transmitterState.isDirectPitch(), transmitterState.isDirectRoll());
+        nav->setTelemCapture(transmitterState.isTelemEnabled());
         return;
     }
 
@@ -145,20 +146,6 @@ void SustainConnectionAction::onReceive(uint8_t length, uint8_t *data, bool resp
 
         nav->updatePIDConfiguration(config.yaw_KP, config.yaw_KI, config.yaw_KD, config.yaw_MAX_I, config.roll_KP, config.roll_KI, config.roll_KD,
                                     config.roll_MAX_I, config.pitch_KP, config.pitch_KI, config.pitch_KD, config.pitch_MAX_I);
-        return;
-    }
-
-    if (data[0] == RADIO_MSG_ID::PID_TELEMETRY) {
-
-        lastReceivedTime = microsSinceEpoch();
-        pid_set_telemetry_t config;
-        msgFromBytes(&config, data, sizeof(pid_set_telemetry_t));
-
-        FDOS_LOG.println("Telemetry switch received!");
-        config.print(&FDOS_LOG);
-
-        nav->setTelemCapture(config.enable);
-
         return;
     }
 
@@ -235,9 +222,13 @@ uint8_t SustainConnectionAction::onSendReady(uint8_t *data, bool &responseExpect
 
         data[1] = length;
 
-            pid_state_t *statesData;
+        for (uint8_t i = 0; i < length; i++) {
+            memcpy(data + 2 + i * 3 * sizeof(pid_state_t), nav->getTelemSample(i), 3 * sizeof(pid_state_t));
+        }
 
         telemRequestIndex = -1;
+
+        return 2 + length * sizeof(pid_state_t) * 3;
     }
 
     receiverState.batV = POWER.getBatteryVoltage();

@@ -111,7 +111,7 @@ void setup() {
     startRadioActions();
 
     FDOS_LOG.println("Initializing esc signals");
-    esc.initMotors();
+    // esc.initMotors();
     for (uint8_t i = 0; i < 10; i++) {
         digitalWrite(LED_PIN, true);
         delay(50);

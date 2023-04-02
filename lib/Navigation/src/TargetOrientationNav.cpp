@@ -10,8 +10,9 @@ pid_state_t *pitchState = 0;
 
 uint16_t nav_telem_skip_counter = 0;
 
+pid_state_t* TELEM_BUFFER = new pid_state_t[NAV_TELEM_SAMPLES*3];
+
 TargetOrientationNav::TargetOrientationNav(ESC *_esc, MotionTask *_motion) : GenericNavTask(_esc, _motion) {
-    telemSamples = new pid_state_t[NAV_TELEM_SAMPLES * 3];
     telemSampleIndex = 0;
 }
 
@@ -54,9 +55,9 @@ esc_objective_attr TargetOrientationNav::nextFrame(TIME_INT_t intervalMicros) {
     if (doTelem && telemCaptureEnabled) {
         uint32_t index = telemSampleIndex % NAV_TELEM_SAMPLES;
 
-        yawState = &telemSamples[index * 3];
-        pitchState = &telemSamples[index * 3 + 1];
-        rollState = &telemSamples[index * 3 + 2];
+        yawState = &TELEM_BUFFER[index * 3];
+        pitchState = &TELEM_BUFFER[index * 3 + 1];
+        rollState = &TELEM_BUFFER[index * 3 + 2];
 
         telemSampleIndex++;
         if (telemSampleIndex == NAV_TELEM_SAMPLES * 2) {
@@ -98,7 +99,7 @@ esc_objective_attr TargetOrientationNav::nextFrame(TIME_INT_t intervalMicros) {
 #ifdef NAV_TRACE_YAW_PID
         if (doTrace) {
             FDOS_LOG.print("YAW_PID:");
-            yawState->print(&FDOS_LOG, yawPID,intervalMillis);
+            yawState->print(&FDOS_LOG, yawPID, intervalMillis);
         }
 #endif
     }
@@ -123,7 +124,7 @@ esc_objective_attr TargetOrientationNav::nextFrame(TIME_INT_t intervalMicros) {
 #ifdef NAV_TRACE_PITCH_PID
         if (doTrace) {
             FDOS_LOG.print("PITCH_PID:");
-            pitchState->print(&FDOS_LOG, pitchPID,intervalMillis);
+            pitchState->print(&FDOS_LOG, pitchPID, intervalMillis);
         }
 #endif
     }
@@ -148,7 +149,7 @@ esc_objective_attr TargetOrientationNav::nextFrame(TIME_INT_t intervalMicros) {
 #ifdef NAV_TRACE_ROLL_PID
         if (doTrace) {
             FDOS_LOG.print("ROLL_PID:");
-            rollState->print(&FDOS_LOG, rollPID,intervalMillis);
+            rollState->print(&FDOS_LOG, rollPID, intervalMillis);
         }
 #endif
     }
@@ -210,22 +211,23 @@ void TargetOrientationNav::setTelemCapture(bool enabled) {
     }
 }
 
-int32_t TargetOrientationNav::getMaxRecordedTelemIndex() {
+uint16_t TargetOrientationNav::getTelemCount() {
     if (telemSampleIndex >= NAV_TELEM_SAMPLES)
-        return NAV_TELEM_SAMPLES - 1;
+        return NAV_TELEM_SAMPLES;
     else
         return telemSampleIndex;
 }
 
-pid_state_t *TargetOrientationNav::getTelemSample(int32_t index) {
-    int32_t maxIndex = getMaxRecordedTelemIndex();
-    if (index > maxIndex)
-        return NULL;
+bool TargetOrientationNav::getTelemSample(int32_t index, uint8_t ypr, pid_state_t &state) {
+    if (index > getTelemCount())
+        return false;
 
     index = telemSampleIndex - index;
 
     if (index < 0)
         index += NAV_TELEM_SAMPLES;
 
-    return &telemSamples[telemSampleIndex * 3];
+    state = TELEM_BUFFER[index * 3 + ypr];
+
+    return true;
 }

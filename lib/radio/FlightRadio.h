@@ -40,6 +40,7 @@ class SustainConnectionAction : RadioAction, RunnableTask {
     TIME_INT_t lastReceivedTime = 0;
 
     int32_t telemRequestIndex = -1;
+    uint8_t telemRequestYPR = 0;
  
     TargetOrientationNav *nav; 
 

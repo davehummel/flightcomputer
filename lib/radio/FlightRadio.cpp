@@ -156,9 +156,9 @@ void SustainConnectionAction::onReceive(uint8_t length, uint8_t *data, bool resp
         msgFromBytes(&config, data, sizeof(pid_request_telemetry_t));
 
         FDOS_LOG.println("Telemetry request received!");
-        config.print(&FDOS_LOG);
 
         telemRequestIndex = config.index;
+        telemRequestYPR = config.telemDimensionYPR;
 
         return;
     }
@@ -210,25 +210,24 @@ uint8_t SustainConnectionAction::onSendReady(uint8_t *data, bool &responseExpect
     if (telemRequestIndex != -1) {
         responseExpected = false;
 
-        data[0] = PID_TELEMETRY_RESPONSE;
+        pid_response_telemetry_t response;
 
-        int32_t maxRecordedIndex = nav->getMaxRecordedTelemIndex();
-        int32_t length = telemRequestIndex - maxRecordedIndex;
+        response.totalSampleCount = nav->getTelemCount();
 
-        if (length < 1)
-            length = 0;
-        else if (length > 5)
-            length = 5;
+        if (telemRequestIndex >= response.totalSampleCount)
+            response.responseSampleCount = 0;
+        else if (response.totalSampleCount - telemRequestIndex >= 15)
+            response.responseSampleCount = 15;
+        else
+            response.responseSampleCount = response.totalSampleCount - telemRequestIndex;
 
-        data[1] = length;
-
-        for (uint8_t i = 0; i < length; i++) {
-            memcpy(data + 2 + i * 3 * sizeof(pid_state_t), nav->getTelemSample(i), 3 * sizeof(pid_state_t));
+        for (uint8_t i = 0 ; i < response.responseSampleCount  ; i++){
+              nav->getTelemSample(telemRequestIndex+i,telemRequestYPR,response.samples[i]);
         }
 
-        telemRequestIndex = -1;
+        msgToBytes(&response,data,response.getSizeInBytes());
 
-        return 2 + length * sizeof(pid_state_t) * 3;
+        return response.getSizeInBytes();
     }
 
     receiverState.batV = POWER.getBatteryVoltage();

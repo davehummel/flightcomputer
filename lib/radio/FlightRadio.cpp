@@ -1,4 +1,5 @@
 #include "FlightRadio.h"
+#include "PID.h"
 #include "PowerControl.h"
 
 ListenTransmitterAction listenTransmitterAction = ListenTransmitterAction();
@@ -120,6 +121,7 @@ void SustainConnectionAction::onReceive(uint8_t length, uint8_t *data, bool resp
         disconnect();
         return;
     }
+
     if (responseExpected) {
         requestSend();
     }
@@ -208,24 +210,32 @@ uint8_t SustainConnectionAction::onSendReady(uint8_t *data, bool &responseExpect
     }
 
     if (telemRequestIndex != -1) {
-        responseExpected = false;
 
         pid_response_telemetry_t response;
 
-        response.totalSampleCount = nav->getTelemCount();
+        response.totalTelemCount = nav->getTelemCount();
+        response.sampleDurationMicros = nav->getTelemSampleDurationMicros();
 
-        if (telemRequestIndex >= response.totalSampleCount)
-            response.responseSampleCount = 0;
-        else if (response.totalSampleCount - telemRequestIndex >= 15)
-            response.responseSampleCount = 15;
+        if (telemRequestIndex >= response.totalTelemCount)
+            response.sampleStartIndex = response.totalTelemCount;
         else
-            response.responseSampleCount = response.totalSampleCount - telemRequestIndex;
+            response.sampleStartIndex = telemRequestIndex;
 
-        for (uint8_t i = 0 ; i < response.responseSampleCount  ; i++){
-              nav->getTelemSample(telemRequestIndex+i,telemRequestYPR,response.samples[i]);
+        uint8_t responseSize;
+
+        if (response.totalTelemCount - response.sampleStartIndex < PID_SAMPLE_SIZE)
+            responseSize = response.totalTelemCount - response.sampleStartIndex;
+        else
+            responseSize = PID_SAMPLE_SIZE;
+
+        for (uint8_t i = 0; i < responseSize; i++) {
+            nav->getTelemSample(telemRequestIndex + i, telemRequestYPR, response.samples[i]);
         }
 
-        msgToBytes(&response,data,response.getSizeInBytes());
+        msgToBytes(&response, data, response.getSizeInBytes());
+
+        responseExpected = true;
+        telemRequestIndex = -1;
 
         return response.getSizeInBytes();
     }

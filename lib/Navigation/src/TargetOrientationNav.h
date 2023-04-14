@@ -18,13 +18,19 @@ class TargetOrientationNav : public GenericNavTask {
                                 int32_t roll_MAX_I, double pitch_KP, double pitch_KI, double pitch_KD, int32_t pitch_MAX_I);
 
     void setTelemCapture(bool enabled) ;
+    
     uint16_t getTelemCount() ;
+    uint32_t getTelemSampleDurationMicros() ;
 
     bool getTelemSample(int32_t index, uint8_t ypr, pid_state_t &state); 
 
 
   protected:
     void activateESCEvent(bool activated);
+
+        
+    int32_t telemSampleIndex; // Protected For unit testing
+    time_t captureStart,captureEnd;
 
   private:
     esc_objective_attr esc;
@@ -38,8 +44,7 @@ class TargetOrientationNav : public GenericNavTask {
     PID rollPID;
     PID pitchPID;
 
-    
-    int32_t telemSampleIndex;
+
 };
 
 

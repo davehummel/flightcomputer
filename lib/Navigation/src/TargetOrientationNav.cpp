@@ -10,11 +10,9 @@ pid_state_t *pitchState = 0;
 
 uint16_t nav_telem_skip_counter = 0;
 
-pid_state_t* TELEM_BUFFER = new pid_state_t[NAV_TELEM_SAMPLES*3];
+pid_state_t *TELEM_BUFFER = new pid_state_t[NAV_TELEM_SAMPLES * 3];
 
-TargetOrientationNav::TargetOrientationNav(ESC *_esc, MotionTask *_motion) : GenericNavTask(_esc, _motion) {
-    telemSampleIndex = 0;
-}
+TargetOrientationNav::TargetOrientationNav(ESC *_esc, MotionTask *_motion) : GenericNavTask(_esc, _motion) { telemSampleIndex = 0; }
 
 void TargetOrientationNav::updatePIDConfiguration(double yaw_KP, double yaw_KI, double yaw_KD, int32_t yaw_MAX_I, double roll_KP, double roll_KI,
                                                   double roll_KD, int32_t roll_MAX_I, double pitch_KP, double pitch_KI, double pitch_KD, int32_t pitch_MAX_I) {
@@ -36,8 +34,6 @@ void TargetOrientationNav::updatePIDConfiguration(double yaw_KP, double yaw_KI, 
 
 esc_objective_attr TargetOrientationNav::nextFrame(TIME_INT_t intervalMicros) {
 
-    uint16_t intervalMillis = intervalMicros / MICROS_PER_MILLI;
-
 #ifdef NAV_TRACE
     bool doTrace = (nav_trace_counter % NAV_TRACE_EVERY == 0);
     if (doTrace)
@@ -47,8 +43,13 @@ esc_objective_attr TargetOrientationNav::nextFrame(TIME_INT_t intervalMicros) {
 #endif
 
     bool doTelem = (nav_trace_counter % NAV_TELEM_EVERY == 0);
-    if (doTelem)
+    if (doTelem) {
         nav_telem_skip_counter = 0;
+#ifdef NAV_TRACE
+        if (doTrace)
+            FDOS_LOG.printf("Telem Index = %i as sample %i on time interval %i \n", telemSampleIndex, getTelemCount(), intervalMicros);
+#endif
+    }
 
     nav_telem_skip_counter++;
 
@@ -83,76 +84,52 @@ esc_objective_attr TargetOrientationNav::nextFrame(TIME_INT_t intervalMicros) {
 
     int16_t yawInput = joy1H;
 
-    if (yawDirectMode) {
+    bool hardYawInput = abs(yawInput < NAV_INPUT_YAW_DIRECT_THRESHOLD);
+    yawInput = yawInput * NAV_INPUT_YAW_SCALE / 255;
+    targetOrientation.yaw = (hardYawInput ? targetOrientation.yaw : currentOrientation.yaw) + yawInput;
+    esc.yaw = yawPID.apply(currentOrientation.yaw, targetOrientation.yaw, intervalMicros, yawState);
+    if (yawDirectMode)
         esc.yaw = yawInput * 1000 / 127;
-        if (yawState != NULL)
-            yawState->zero();
 #ifdef NAV_TRACE_YAW_PID
-        if (doTrace)
-            FDOS_LOG.printf("Direct YAW S:%i\n", esc.yaw);
-#endif
-    } else {
-        bool hardYawInput = abs(yawInput < NAV_INPUT_YAW_DIRECT_THRESHOLD);
-        yawInput = yawInput * NAV_INPUT_YAW_SCALE / 255;
-        targetOrientation.yaw = (hardYawInput ? targetOrientation.yaw : currentOrientation.yaw) + yawInput;
-        esc.yaw = yawPID.apply(currentOrientation.yaw, targetOrientation.yaw, intervalMillis, yawState);
-#ifdef NAV_TRACE_YAW_PID
-        if (doTrace) {
-            FDOS_LOG.print("YAW_PID:");
-            yawState->print(&FDOS_LOG, yawPID, intervalMillis);
-        }
-#endif
+    if (doTrace) {
+        FDOS_LOG.print("YAW_PID:");
+        yawState->print(&FDOS_LOG, yawPID);
     }
+#endif
 
     // PITCH
 
     int16_t pitchInput = -joy1V;
 
-    if (pitchDirectMode) {
+    bool hardPitchInput = abs(pitchInput < NAV_INPUT_PITCH_DIRECT_THRESHOLD);
+    pitchInput = pitchInput * NAV_INPUT_PITCH_SCALE / 255;
+    targetOrientation.pitch = (hardPitchInput ? targetOrientation.pitch : currentOrientation.pitch) + pitchInput;
+    esc.pitch = pitchPID.apply(currentOrientation.pitch, targetOrientation.pitch, intervalMicros, pitchState);
+    if (pitchDirectMode)
         esc.pitch = pitchInput * 1000 / 127;
-        if (pitchState != NULL)
-            pitchState->zero();
 #ifdef NAV_TRACE_PITCH_PID
-        if (doTrace)
-            FDOS_LOG.printf("Direct PCH S:%i\n", esc.pitch);
-#endif
-    } else {
-        bool hardPitchInput = abs(pitchInput < NAV_INPUT_PITCH_DIRECT_THRESHOLD);
-        pitchInput = pitchInput * NAV_INPUT_PITCH_SCALE / 255;
-        targetOrientation.pitch = (hardPitchInput ? targetOrientation.pitch : currentOrientation.pitch) + pitchInput;
-        esc.pitch = pitchPID.apply(currentOrientation.pitch, targetOrientation.pitch, intervalMillis, pitchState);
-#ifdef NAV_TRACE_PITCH_PID
-        if (doTrace) {
-            FDOS_LOG.print("PITCH_PID:");
-            pitchState->print(&FDOS_LOG, pitchPID, intervalMillis);
-        }
-#endif
+    if (doTrace) {
+        FDOS_LOG.print("PITCH_PID:");
+        pitchState->print(&FDOS_LOG, pitchPID);
     }
+#endif
 
     // ROLL
 
     int16_t rollInput = joy2H;
 
-    if (rollDirectMode) {
+    bool hardRollInput = abs(rollInput < NAV_INPUT_ROLL_DIRECT_THRESHOLD);
+    rollInput = rollInput * NAV_INPUT_ROLL_SCALE / 255;
+    targetOrientation.roll = (hardRollInput ? targetOrientation.roll : currentOrientation.roll) + rollInput;
+    esc.roll = rollPID.apply(currentOrientation.roll, targetOrientation.roll, intervalMicros, rollState);
+    if (rollDirectMode)
         esc.roll = (rollInput * 1000) / 127;
-        if (rollState != NULL)
-            rollState->zero();
 #ifdef NAV_TRACE_ROLL_PID
-        if (doTrace)
-            FDOS_LOG.printf("Direct RLL S:%i\n", esc.roll);
-#endif
-    } else {
-        bool hardRollInput = abs(rollInput < NAV_INPUT_ROLL_DIRECT_THRESHOLD);
-        rollInput = rollInput * NAV_INPUT_ROLL_SCALE / 255;
-        targetOrientation.roll = (hardRollInput ? targetOrientation.roll : currentOrientation.roll) + rollInput;
-        esc.roll = rollPID.apply(currentOrientation.roll, targetOrientation.roll, intervalMillis, rollState);
-#ifdef NAV_TRACE_ROLL_PID
-        if (doTrace) {
-            FDOS_LOG.print("ROLL_PID:");
-            rollState->print(&FDOS_LOG, rollPID, intervalMillis);
-        }
-#endif
+    if (doTrace) {
+        FDOS_LOG.print("ROLL_PID:");
+        rollState->print(&FDOS_LOG, rollPID);
     }
+#endif
 
     esc.throttle = (joy2V * NAV_INPUT_THROTTLE_SCALE) / 255;
 
@@ -177,12 +154,18 @@ void TargetOrientationNav::activateESCEvent(bool activated) {
 }
 
 void TargetOrientationNav::holdOrientation(bool yaw, bool pitch, bool roll) {
-    if (yaw)
+    if (yaw) {
         targetOrientation.yaw = currentOrientation.yaw;
-    if (pitch)
+        yawPID.reset();
+    }
+    if (pitch) {
         targetOrientation.pitch = currentOrientation.pitch;
-    if (roll)
+        pitchPID.reset();
+    }
+    if (roll) {
         targetOrientation.roll = currentOrientation.roll;
+        rollPID.reset();
+    }
 }
 
 void TargetOrientationNav::setControlMode(bool yawDirect, bool pitchDirect, bool rollDirect) {
@@ -205,9 +188,15 @@ void TargetOrientationNav::setControlMode(bool yawDirect, bool pitchDirect, bool
 void TargetOrientationNav::setTelemCapture(bool enabled) {
     if (telemCaptureEnabled != enabled) {
         FDOS_LOG.print("Switching Telemetry ");
-        FDOS_LOG.println(enabled ? "On" : "Off");
         telemCaptureEnabled = enabled;
-        telemSampleIndex = 0;
+        if (enabled) {
+            telemSampleIndex = 0;
+            FDOS_LOG.println("On!");
+            captureStart = micros64();
+        } else {
+            captureEnd = micros64();
+            FDOS_LOG.printf("Off after %i samples\n", getTelemCount());
+        }
     }
 }
 
@@ -216,6 +205,14 @@ uint16_t TargetOrientationNav::getTelemCount() {
         return NAV_TELEM_SAMPLES;
     else
         return telemSampleIndex;
+}
+
+uint32_t TargetOrientationNav::getTelemSampleDurationMicros() {
+    if (telemSampleIndex == 0)
+        return 0;
+    else
+        return (captureEnd - captureStart) / getTelemCount();
+    ;
 }
 
 bool TargetOrientationNav::getTelemSample(int32_t index, uint8_t ypr, pid_state_t &state) {
